@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 7 - Embeddability.
 
 Can another system run, configure and compose this one without a human in the

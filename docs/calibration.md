@@ -36,8 +36,12 @@ Treat the numbers as **rankings**, not measurements, until they are calibrated.
 - YAML OpenAPI is parsed by indentation (no YAML dependency); `$ref`'d path files are not followed.
 - The import graph covers Python and JS/TS only.
 - Tokens are estimated at 4 characters per token.
-- Content signals are regexes over source text, so string literals can match. neosloc
-  scanning itself sees its own patterns as environment reads and deprecation markers.
+- Content signals are regexes over the code view. Identifier-like strings that only name a
+  practice (a label `"websocket"`, a header list) still match. Files made of such
+  vocabulary can opt out with a `neosloc: ignore` comment.
+- The code view understands Python fully (via `tokenize`). Other languages use a
+  lightweight scanner: unusual syntax (JS regex/division edge cases, heredocs) can slip
+  through.
 - The grader checks that what the agent names exists. It does not check that the steps
   achieve the task, unless `--judge` or live mode is used.
 - Fix commits are recognised from commit subjects, so squash-merged or terse histories

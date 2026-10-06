@@ -15,6 +15,21 @@ Detectors only read **product code**: tests, examples, docs, fixtures, vendored 
 Library names are trusted only when they appear in dependency manifests, and transitive
 dependencies (`// indirect` in `go.mod`) are ignored.
 
+Content signals match the **code view** of each file, not its raw text. Text that talks
+*about* a practice isn't evidence of it, so the code view removes:
+
+- comments and docstrings;
+- strings that read like English sentences (messages, help texts, prompts). Identifiers,
+  headers, paths, MIME types and SQL stay;
+- the contents of regex literals: Python raw strings and `re.*` arguments, JS `/…/`
+  literals and `RegExp(…)`, Go `regexp.MustCompile`, Rust `Regex::new`, Java, C# and PHP
+  equivalents. The delimiters stay, and route detection still sees regex contents,
+  because Django routes are regexes.
+
+A file whose strings are detection vocabulary (a linter's rules, a scanner's patterns) can
+opt out of content signals entirely with a `neosloc: ignore` comment in its first five
+lines. neosloc uses it on its own detector modules.
+
 ## Interface surface (`interface`)
 
 *Is there a machine-readable contract, how much of the implemented surface does it cover,

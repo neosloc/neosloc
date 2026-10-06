@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 9 - Observability.
 
 Can an operator or orchestrating agent tell whether it is working, and why

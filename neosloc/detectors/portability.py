@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 5 - Data portability.
 
 Can the data get in and out in bulk, in open formats, with a known schema?
@@ -12,7 +13,7 @@ from .signals import Signal, level_from, score_signals
 
 SIGNALS = [
     Signal("export", "code",
-           r"""(def|function|func|fn)\s+\w*(export|dump|backup)\w*\s*\(|['"`]/[\w/{}:<>.-]*\b(export|dump|backup)\b"""
+           r"""(def|function|func|fn)\s+\w*(export|backup)\w*\s*\(|['"`]/[\w/{}:<>.-]*\b(export|dump|backup)\b"""
            r"""|add_parser\(\s*['"](export|dump|backup)""",
            1.0, "Provide a bulk export (API endpoint or command) of all user data."),
     Signal("import", "code",
@@ -20,7 +21,7 @@ SIGNALS = [
            r"""|add_parser\(\s*['"](import|restore|load)""",
            0.5, "Provide a bulk import so data can be migrated in."),
     Signal("open-formats", "code",
-           r"csv\.writer|DictWriter|to_csv\(|json\.dump|ndjson|jsonl|parquet|pyarrow|geojson|"
+           r"csv\.writer|DictWriter|to_csv\(|json\.dump\(|ndjson|jsonl|parquet|pyarrow|geojson|"
            r"icalendar|\.ics\b|vcard|json-ld|rdflib|datapackage|frictionless|xlsx|openpyxl", 0.5),
     Signal("schema-in-repo", "path",
            r"(^|/)(migrations/|alembic/|db/migrate/|prisma/schema\.prisma$|schema\.sql$|"

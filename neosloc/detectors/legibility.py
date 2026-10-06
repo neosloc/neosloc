@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 10 - Change legibility (the heir to SLOC).
 
 How much context does an agent (or a human) need to change this code safely?

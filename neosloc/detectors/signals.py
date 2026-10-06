@@ -63,7 +63,8 @@ def score_signals(repo: Repo, ctx: dict, signals: Sequence[Signal]
             rx = re.compile(sig.pattern)
             hits: Dict[str, int] = {f: 1 for f in repo.files if rx.search(f)}
         else:
-            hits = repo.grep(re.compile(sig.pattern, re.M | re.I), _files(repo, sig.where, ctx))
+            hits = repo.grep(re.compile(sig.pattern, re.M | re.I), _files(repo, sig.where, ctx),
+                             keep_regex=sig.where == "routes")
         if hits:
             found.add(sig.name)
             top = max(hits, key=hits.get)

@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 4 - Identity.
 
 Can a machine act on this system with its own, narrowly-scoped identity?

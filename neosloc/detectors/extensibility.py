@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 8 - Extensibility.
 
 Can behaviour be added without forking? Plugin discovery, hook/event APIs,

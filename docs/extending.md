@@ -5,6 +5,7 @@
 ```text
 neosloc/
   repo.py            file inventory, cached reads, git, classification (test/example/vendored/generated)
+  codeview.py        what content signals see: no comments, docstrings, prose or regex literals
   specs.py           OpenAPI/AsyncAPI/GraphQL/proto discovery and parsing (no YAML dependency)
   detectors/
     base.py          register(), the Context dict, the DIMENSIONS registry
@@ -67,8 +68,11 @@ otherwise satisfied.
 
 - **Every level needs evidence with a path**, and every missing point should produce a gap
   phrased as an action.
-- **Trust library names only in `deps`.** Matching them in code picks up string literals,
-  including neosloc's own patterns when it scans itself.
+- **Trust library names only in `deps`.** Code is matched through the code view
+  (`neosloc/codeview.py`), which drops comments, docstrings, prose strings and regex
+  literals, but ordinary identifier-like strings remain.
+- **Detector modules start with `# neosloc: ignore`**, so neosloc doesn't score itself on
+  its own vocabulary. `tests/test_codeview.py::SelfScan` enforces this.
 - **Add a regression test for every false positive you fix.** `tests/test_neosloc.py` builds
   small fixture repositories in temporary directories.
 - **Check against real repositories** before changing thresholds. `neosloc --review` with a

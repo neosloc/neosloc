@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 2 - Contract stability.
 
 Can an integrator rely on the surface not moving under them? Signals: release
@@ -16,7 +17,7 @@ from .base import Context, register
 
 SEMVER_TAG = re.compile(r"^v?\d+\.\d+(\.\d+)?([-+.].*)?$")
 CHANGELOG = re.compile(r"^((docs?|packages/[^/]+)/)?(CHANGELOG|CHANGES|HISTORY|NEWS|RELEASES?)(\.(md|rst|txt|adoc))?$", re.I)
-VERSIONED_PATH = re.compile(r"""['"`]/(api/)?v\d+(/|['"`])""")
+VERSIONED_PATH = re.compile(r"""['"`]\^?/?(api/)?v\d+(/|['"`])""")  # /v1/, api/v1/, ^api/v1/ (Django)
 DEPRECATION = re.compile(
     r"@Deprecated|@deprecated|DeprecationWarning|#\[deprecated|\bdeprecated\s*=\s*True"
     r"|Deprecation:|Sunset:|\[Obsolete"
@@ -74,7 +75,7 @@ def detect(repo: Repo, ctx: Context) -> DimensionResult:
 
     src = repo.source_files(include_tests=False)
     # Only where routes are declared: /v1/ in an HTTP client call is someone else's API.
-    versioned = repo.grep(VERSIONED_PATH, ctx.get("route_files", []))
+    versioned = repo.grep(VERSIONED_PATH, ctx.get("route_files", []), keep_regex=True)
     versioned.update({s.path: 1 for s in ctx.get("specs", [])
                       if any(re.match(r"\w+ /(api/)?v\d+/", op) for op in s.operations)})
     if versioned:

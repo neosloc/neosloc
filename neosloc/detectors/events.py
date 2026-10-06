@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 3 - Events.
 
 Can other systems react to what happens here without polling? Signals:

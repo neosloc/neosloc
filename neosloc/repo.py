@@ -9,6 +9,8 @@ import os
 import re
 import subprocess
 from functools import lru_cache
+
+from .codeview import code_view, has_ignore_pragma
 from typing import Dict, Iterable, Iterator, List, Optional, Pattern
 
 SKIP_DIRS = {
@@ -123,6 +125,16 @@ class Repo:
             return ""  # binary
         return data.decode("utf-8", errors="replace")
 
+    @lru_cache(maxsize=None)
+    def code_text(self, rel: str, keep_regex: bool = False) -> str:
+        """Source as content signals should see it: no comments or docstrings and,
+        unless keep_regex, regex literals blanked (see codeview)."""
+        text = self.read(rel)
+        lang = self.language(rel)
+        if lang and has_ignore_pragma(text):
+            return ""
+        return code_view(text, lang, keep_regex) if lang else text
+
     def exists(self, rel: str) -> bool:
         return rel in self._fileset
 
@@ -138,11 +150,19 @@ class Repo:
         return [f for f in self.files if rx.search(f)]
 
     def grep(self, pattern: Pattern, files: Optional[Iterable[str]] = None,
-             limit: Optional[int] = None) -> Dict[str, int]:
-        """Return {path: match_count} for files whose text matches `pattern`."""
+             limit: Optional[int] = None, keep_regex: bool = False) -> Dict[str, int]:
+        """Return {path: match_count} for files whose text matches `pattern`.
+
+        Source files are matched through their code view, so comments,
+        docstrings and (unless keep_regex) regex literals don't count."""
         hits: Dict[str, int] = {}
         for rel in files if files is not None else self.source_files():
-            text = self.dependency_text(rel) if MANIFEST_RE.search(rel) else self.read(rel)
+            if MANIFEST_RE.search(rel):
+                text = self.dependency_text(rel)
+            elif self.language(rel):
+                text = self.code_text(rel, keep_regex)
+            else:
+                text = self.read(rel)
             n = len(pattern.findall(text))
             if n:
                 hits[rel] = n

@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 6 - Agent ergonomics.
 
 Given a surface exists, how forgiving and self-explanatory is it for an

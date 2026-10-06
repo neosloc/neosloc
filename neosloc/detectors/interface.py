@@ -1,3 +1,4 @@
+# neosloc: ignore (detection vocabulary, not usage)
 """Dimension 1 - Interface surface.
 
 Is there a machine-readable contract, and how much of the implemented surface
@@ -101,7 +102,8 @@ def _count_routes(repo: Repo) -> Dict[str, Dict[str, int]]:
     src = repo.source_files(include_tests=False)
     for fw, path_rx, route_rx in ROUTE_PATTERNS:
         prx, rrx = re.compile(path_rx), re.compile(route_rx, re.M)
-        hits = repo.grep(rrx, [f for f in src if prx.search(f)])
+        # Route patterns are often regexes themselves (Django re_path), so keep them.
+        hits = repo.grep(rrx, [f for f in src if prx.search(f)], keep_regex=True)
         if hits:
             by_fw[fw] = hits
     return by_fw
