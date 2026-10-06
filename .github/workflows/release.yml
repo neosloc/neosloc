@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
       - name: Check the tag matches the package version
         run: |
           version=$(python3 -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('neosloc/__init__.py').read()).group(1))")

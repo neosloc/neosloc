@@ -1,6 +1,6 @@
 site_name: neosloc
 site_description: Integrability evaluation for software repositories, and what a codebase is worth when code is cheap.
-site_url: https://sirmmo.github.io/neosloc/
+site_url: https://ingmmo.com/neosloc/
 repo_url: https://github.com/sirmmo/neosloc
 repo_name: sirmmo/neosloc
 edit_uri: edit/main/docs/

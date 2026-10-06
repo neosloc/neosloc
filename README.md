@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/sirmmo/neosloc/actions/workflows/ci.yml/badge.svg)](https://github.com/sirmmo/neosloc/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/neosloc)](https://pypi.org/project/neosloc/)
-[![docs](https://img.shields.io/badge/docs-sirmmo.github.io%2Fneosloc-blue)](https://sirmmo.github.io/neosloc/)
+[![docs](https://img.shields.io/badge/docs-ingmmo.com%2Fneosloc-blue)](https://ingmmo.com/neosloc/)
 
 `sloccount` counted lines of code and fed them to COCOMO to estimate the effort to *build*
 software. With LLMs writing code, lines are cheap and that estimate has lost its meaning.
@@ -45,7 +45,7 @@ Value (neoCOCOMO, cost approach; see neosloc/value.py)
   Knowledge at risk:             38% of replacement cost lives only in code and history
 ```
 
-**Documentation: <https://sirmmo.github.io/neosloc/>**
+**Documentation: <https://ingmmo.com/neosloc/>**
 
 ## Install
 
@@ -72,9 +72,9 @@ OpenRouter models need no extra package, only `OPENROUTER_API_KEY`.
 | `observability` | Health/readiness, metrics, tracing, structured logs, error tracking. |
 | `legibility` | The heir to SLOC: tokens per module, import cycles, tests, types, CI, lockfiles, agent docs. |
 
-Details: [dimensions](https://sirmmo.github.io/neosloc/dimensions/),
-[retrofit effort](https://sirmmo.github.io/neosloc/estimate/),
-[neoCOCOMO](https://sirmmo.github.io/neosloc/value/).
+Details: [dimensions](https://ingmmo.com/neosloc/dimensions/),
+[retrofit effort](https://ingmmo.com/neosloc/estimate/),
+[neoCOCOMO](https://ingmmo.com/neosloc/value/).
 
 ## LLM evaluators
 
@@ -92,13 +92,13 @@ neosloc --review --review-model openrouter:google/gemini-3.8-flash,openrouter:de
 Models are written `provider:model`. The default is `anthropic:claude-opus-5-5` at effort
 `medium`. A comma-separated list runs a panel and reports agreement. Every model call
 shares one `--max-cost` budget (default $5), and the report states the total. See
-[LLM evaluators](https://sirmmo.github.io/neosloc/evaluators/) and
-[Using OpenRouter](https://sirmmo.github.io/neosloc/openrouter/).
+[LLM evaluators](https://ingmmo.com/neosloc/evaluators/) and
+[Using OpenRouter](https://ingmmo.com/neosloc/openrouter/).
 
 ## Status
 
 All thresholds and coefficients are uncalibrated, so treat the numbers as rankings.
-[Calibration and limits](https://sirmmo.github.io/neosloc/calibration/) describes how to fix
+[Calibration and limits](https://ingmmo.com/neosloc/calibration/) describes how to fix
 that; `--review` and `--agentic` exist partly to do it.
 
 ## Development
@@ -108,7 +108,7 @@ python -m unittest discover -s tests -t .     # no network, no API spend
 python -m neosloc .
 ```
 
-See [Writing detectors](https://sirmmo.github.io/neosloc/extending/) and `AGENTS.md`.
+See [Writing detectors](https://ingmmo.com/neosloc/extending/) and `AGENTS.md`.
 Releases: bump `neosloc/__init__.py`, add a `CHANGELOG.md` section, push a `vX.Y.Z` tag.
 
 MIT licensed.
