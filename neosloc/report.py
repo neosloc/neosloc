@@ -58,7 +58,59 @@ def to_text(report: Report, verbose: bool = False) -> str:
         out.append("  by dimension: " + breakdown)
     out.append("  (size factor %.2f, legibility multiplier %.2f; heuristic, see neosloc/estimate.py)"
                % (a["size_factor"], a["legibility_multiplier"]))
+    if report.value:
+        out.append("")
+        out.extend(_value_lines(report.value))
+    if report.agentic:
+        out.append("")
+        out.extend(_agentic_lines(report.agentic, {d.key: d.level for d in report.dimensions}))
     return "\n".join(out)
+
+
+def _money(n: float) -> str:
+    return "$" + _k(int(n))
+
+
+def _value_lines(v) -> list:
+    c, h, cap = v["classic"], v["history"], v["capture"]
+    return [
+        "Value (neoCOCOMO, cost approach; see neosloc/value.py)",
+        "  Classic COCOMO (sloccount):    %.1f KSLOC -> %.1f person-months, %.1f months, %s"
+        % (v["ksloc"], c["person_months"], c["schedule_months"], _money(c["cost"])),
+        "  Behaviour captured:            %d%% (tests %.2f, contract %.2f, docs %.2f)"
+        % (round(cap["capture"] * 100), cap["tests"], cap["contract"], cap["docs"]),
+        "  Reproduce with agents:         x%.2f of classic -> %.1f PM" % (v["agent_factor"], v["reproduce_pm"]),
+        "  Rediscover uncaptured history: %d fix / %d commits, %d authors -> %.1f PM knowledge, %.1f PM uncaptured"
+        % (h["fix_commits"], h["commits"], h["authors"], v["knowledge_pm"], v["rediscover_pm"]),
+        "  Replacement cost new:          %.1f PM" % v["replacement_pm"],
+        "  x leverage %.2f (integrability) x obsolescence %.2f (staleness, legibility)"
+        % (v["leverage"], v["obsolescence"]),
+        "  Value:                         %.1f PM ~ %s  (at %s per PM)"
+        % (v["value_pm"], _money(v["value_cost"]), _money(v["assumptions"]["cost_per_pm"])),
+        "  Knowledge at risk:             %d%% of replacement cost lives only in code and history"
+        % round(v["knowledge_at_risk"] * 100),
+    ]
+
+
+def _agentic_lines(a, static_levels) -> list:
+    out = ["Agentic probe (%s, effort %s, scope %s)" % (a["model"], a["effort"], ", ".join(a["scopes"]))]
+    for scope, s in a["summary"].items():
+        out.append("  %-7s success %d/%d (%d%%), level %d, %s tokens, ~$%.2f"
+                   % (scope, s["succeeded"], s["tasks"], round(100 * s["success_rate"]), s["level"],
+                      _k(s["tokens"]), s["cost_usd"]))
+    for t in a["tasks"]:
+        mark = "ok " if t["success"] else "-- "
+        static = static_levels.get(t["dimension"])
+        out.append("  %s[%s] %-9s %-12s %-26s (%d turns, %d tool calls, %s tok)%s"
+                   % (mark, t["scope"], t["task"], t["outcome"],
+                      "%s static %s" % (t["dimension"], "-" if static is None else static),
+                      t["turns"], t["tool_calls"],
+                      _k(t["input_tokens"] + t["output_tokens"]),
+                      "" if t["success"] else ": " + "; ".join(t["problems"][:2])))
+    if "documentation_gap" in a:
+        out.append("  Documentation gap: %+d%% success when the agent may read source"
+                   % round(100 * a["documentation_gap"]))
+    return out
 
 
 def _k(n: int) -> str:

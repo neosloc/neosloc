@@ -32,7 +32,6 @@ ROUTE_PATTERNS = [
 ]
 
 # Frameworks/libraries that expose a spec generated from code at runtime.
-MANIFEST = r"(^|/)(requirements[\w.-]*\.(txt|in)|pyproject\.toml|setup\.(py|cfg)|Pipfile|package\.json|go\.mod|Cargo\.toml|pom\.xml|build\.gradle(\.kts)?|[\w.]+\.csproj|Gemfile|composer\.json)$"
 
 # Frameworks/libraries that expose a spec generated from code at runtime.
 # (name, "manifest" | "code", regex). Library names are only trusted in
@@ -110,7 +109,7 @@ def _count_routes(repo: Repo) -> Dict[str, Dict[str, int]]:
 
 def _generated(repo: Repo) -> List[Evidence]:
     out = []
-    manifests = repo.glob(MANIFEST)
+    manifests = repo.manifests()
     code = repo.source_files(include_tests=False)
     for name, where, rx in GENERATED_SPEC:
         files = manifests if where == "manifest" else code

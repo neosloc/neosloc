@@ -4,12 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neosloc"
-version = "0.1.0"
+version = "0.2.0"
 description = "Integrability evaluation for software repositories: what SLOC measured, re-asked for the age of LLMs."
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 dependencies = []
+
+[project.optional-dependencies]
+# Agentic mode only; the static analysis stays dependency-free on Python 3.8.
+agentic = ["anthropic>=1.11; python_version >= '3.10'"]
 
 [project.scripts]
 neosloc = "neosloc.cli:main"

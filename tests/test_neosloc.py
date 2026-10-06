@@ -196,6 +196,110 @@ class Libraries(Fixture):
         self.assertEqual(self.dim(analyze(self.dir), "interface").metrics["spec_files"], 0)
 
 
+class SignalDetectors(Fixture):
+    """One positive and one negative case per signal-based dimension."""
+
+    def level(self, key):
+        return self.dim(analyze(self.dir, with_value=False), key)
+
+    def setUp(self):
+        super().setUp()
+        self.write("app/main.py", "from fastapi import FastAPI\napp = FastAPI()\n"
+                   "@app.get('/v1/items')\ndef items():\n    return []\n")
+
+    def test_events_inbound_webhooks_are_not_events(self):
+        self.write("app/hooks.py", "def stripe_webhook(request):\n    hmac.new(key)\n")
+        ev = self.level("events")
+        self.assertNotIn("webhooks", ev.metrics["signals"])
+        self.assertLessEqual(ev.level, 1)
+
+    def test_events_outbound(self):
+        self.write("app/hooks.py", "def deliver_webhook(sub):\n    sig = hmac.new(key)\n")
+        self.write("app/stream.py", "from sse_starlette import EventSourceResponse\n")
+        ev = self.level("events")
+        self.assertIn("webhooks", ev.metrics["signals"])
+        self.assertGreaterEqual(ev.level, 3)
+
+    def test_identity(self):
+        self.assertEqual(self.level("identity").level, 0)
+        self.write("app/auth.py", "from fastapi.security import HTTPBearer, OAuth2\nimport authlib\n"
+                   "Security(dep, scopes=['items:read'])\n")
+        self.assertEqual(self.level("identity").level, 3)
+
+    def test_portability_requires_export(self):
+        self.write("app/models.py", "class Item: pass\n")
+        self.assertLessEqual(self.level("portability").level, 2)
+        self.write("app/export.py", "import csv\ndef export_items(out):\n    csv.writer(out)\n"
+                   "def import_items(f):\n    pass\n")
+        self.assertGreaterEqual(self.level("portability").level, 3)
+
+    def test_export_keyword_in_js_is_not_an_export(self):
+        self.write("web/i18n.js", "export default { 'export': 'Export' }\n")
+        self.assertNotIn("export", self.level("portability").metrics["signals"])
+
+    def test_ergonomics(self):
+        self.write("app/errors.py", "MEDIA = 'application/problem+json'\nfrom pydantic import BaseModel\n"
+                   "IDEMPOTENCY = 'Idempotency-Key'\nH = 'X-RateLimit-Remaining'\ncursor = None\n")
+        self.assertGreaterEqual(self.level("ergonomics").level, 3)
+
+    def test_ergonomics_needs_a_surface(self):
+        os.remove(os.path.join(self.dir, "app/main.py"))
+        self.write("app/errors.py", "MEDIA = 'application/problem+json'\n")
+        self.assertEqual(self.level("ergonomics").level, 0)
+
+    def test_extensibility(self):
+        self.assertEqual(self.level("extensibility").level, 0)
+        self.write("app/plugins.py", "import pluggy\npm = pluggy.PluginManager('items')\n"
+                   "pm.load_setuptools_entrypoints('items')\nhookspec = pluggy.HookspecMarker('items')\n"
+                   "@hookspec\ndef on_create(item): pass\n")
+        self.assertGreaterEqual(self.level("extensibility").level, 3)
+
+    def test_vendored_code_is_ignored(self):
+        self.write("static/libs/leaflet.js", "map.on('click', f); new EventEmitter();\n")
+        self.assertEqual(self.level("extensibility").level, 0)
+
+    def test_indirect_go_deps_ignored(self):
+        self.write("go.mod", "module x\nrequire (\n\tgithub.com/prometheus/client_golang v1 // indirect\n)\n")
+        self.assertNotIn("metrics", self.level("observability").metrics["signals"])
+
+    def test_observability(self):
+        self.write("app/ops.py", "@app.get('/healthz')\ndef h(): pass\n"
+                   "from prometheus_client import Counter\nimport structlog\n"
+                   "from opentelemetry import trace\n")
+        self.assertEqual(self.level("observability").level, 4)
+
+
+class Value(Fixture):
+    def test_value_model(self):
+        self.git("init", "-q")
+        self.write("app/core.py", "\n".join("x%d = %d  # c" % (i, i) for i in range(500)) + "\n# only comment\n")
+        self.commit("initial")
+        self.write("app/core.py", self.read_back("app/core.py") + "y = 1\n")
+        self.commit("fix crash on empty input")
+        v = analyze(self.dir).value
+        self.assertAlmostEqual(v["ksloc"], 0.501, places=2)
+        self.assertEqual(v["history"]["commits"], 2)
+        self.assertEqual(v["history"]["fix_commits"], 1)
+        # No tests, contract or docs: nothing captured, maximum agent factor.
+        self.assertEqual(v["capture"]["capture"], 0.0)
+        self.assertEqual(v["agent_factor"], 0.55)
+        self.assertAlmostEqual(v["knowledge_pm"], 0.03, places=2)
+        self.assertEqual(v["knowledge_at_risk"],
+                         round(v["rediscover_pm"] / v["replacement_pm"], 2))
+        self.assertGreater(v["classic"]["cost"], 0)
+
+    def test_tests_and_docs_reduce_reproduction_cost(self):
+        self.write("app/core.py", "def f(a: int) -> int:\n    return a\n" * 50)
+        bare = analyze(self.dir).value["agent_factor"]
+        self.write("tests/test_core.py", "def test_f() -> None:\n    assert f(1) == 1\n" * 50)
+        self.write("README.md", "# Core\n" + "Explains f in detail.\n" * 200)
+        self.assertLess(analyze(self.dir).value["agent_factor"], bare)
+
+    def read_back(self, rel):
+        with open(os.path.join(self.dir, rel)) as fh:
+            return fh.read()
+
+
 class SpecHistory(Fixture):
     def test_detects_removed_operation(self):
         self.git("init", "-q")

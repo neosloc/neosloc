@@ -49,6 +49,8 @@ class Report:
     dimensions: List[DimensionResult]
     estimate: Dict[str, Any]
     not_implemented: List[str]
+    value: Optional[Dict[str, Any]] = None
+    agentic: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -57,6 +59,8 @@ class Report:
             "dimensions": [d.to_dict() for d in self.dimensions],
             "estimate": self.estimate,
             "not_implemented": self.not_implemented,
+            "value": self.value,
+            "agentic": self.agentic,
         }
 
 
