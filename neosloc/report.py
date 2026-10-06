@@ -64,6 +64,15 @@ def to_text(report: Report, verbose: bool = False) -> str:
     if report.agentic:
         out.append("")
         out.extend(_agentic_lines(report.agentic, {d.key: d.level for d in report.dimensions}))
+    if report.review:
+        out.append("")
+        out.extend(_review_lines(report.review))
+    if report.spend:
+        out.append("")
+        out.append("Model spend: $%.2f of $%.2f budget%s" % (
+            report.spend["usd"], report.spend["max_usd"],
+            "; %d call(s) could not be priced" % report.spend["unpriced_calls"]
+            if report.spend["unpriced_calls"] else ""))
     return "\n".join(out)
 
 
@@ -93,23 +102,52 @@ def _value_lines(v) -> list:
 
 
 def _agentic_lines(a, static_levels) -> list:
-    out = ["Agentic probe (%s, effort %s, scope %s)" % (a["model"], a["effort"], ", ".join(a["scopes"]))]
-    for scope, s in a["summary"].items():
-        out.append("  %-7s success %d/%d (%d%%), level %d, %s tokens, ~$%.2f"
-                   % (scope, s["succeeded"], s["tasks"], round(100 * s["success_rate"]), s["level"],
-                      _k(s["tokens"]), s["cost_usd"]))
-    for t in a["tasks"]:
-        mark = "ok " if t["success"] else "-- "
-        static = static_levels.get(t["dimension"])
-        out.append("  %s[%s] %-9s %-12s %-26s (%d turns, %d tool calls, %s tok)%s"
-                   % (mark, t["scope"], t["task"], t["outcome"],
-                      "%s static %s" % (t["dimension"], "-" if static is None else static),
-                      t["turns"], t["tool_calls"],
-                      _k(t["input_tokens"] + t["output_tokens"]),
-                      "" if t["success"] else ": " + "; ".join(t["problems"][:2])))
-    if "documentation_gap" in a:
-        out.append("  Documentation gap: %+d%% success when the agent may read source"
-                   % round(100 * a["documentation_gap"]))
+    out = []
+    for run in a["runs"]:
+        head = "Agentic probe (%s, effort %s, scope %s%s)" % (
+            run["model"], run["effort"], ", ".join(run["scopes"]),
+            ", judge " + run["judge"] if run.get("judge") else "")
+        out.append(head)
+        for scope, s in run["summary"].items():
+            cost = "?" if s["cost_usd"] is None else "%.2f" % s["cost_usd"]
+            out.append("  %-7s success %d/%d (%d%%), level %d, %s tokens, ~$%s"
+                       % (scope, s["succeeded"], s["tasks"], round(100 * s["success_rate"]), s["level"],
+                          _k(s["tokens"]), cost))
+        for t in run["tasks"]:
+            mark = "ok " if t["success"] else "-- "
+            static = static_levels.get(t["dimension"])
+            out.append("  %s[%s] %-9s %-12s %-26s (%d turns, %d tool calls, %s tok)%s"
+                       % (mark, t["scope"], t["task"], t["outcome"],
+                          "%s static %s" % (t["dimension"], "-" if static is None else static),
+                          t["turns"], t["tool_calls"], _k(t["input_tokens"] + t["output_tokens"]),
+                          "" if t["success"] else ": " + "; ".join(t["problems"][:2])))
+        if "documentation_gap" in run:
+            out.append("  Documentation gap: %+d%% success when the agent may read source"
+                       % round(100 * run["documentation_gap"]))
+        out.append("")
+    p = a.get("panel")
+    if p:
+        out.append("Probe panel (%s): models agree on %d%% of tasks"
+                   % (", ".join(p["models"]), round(100 * (p["agreement"] or 0))))
+        for cell, share in sorted(p["success_share"].items()):
+            out.append("  %-18s %d%% of models succeeded" % (cell, round(100 * share)))
+        out.append("")
+    return out[:-1] if out and out[-1] == "" else out
+
+
+def _review_lines(r) -> list:
+    out = ["LLM review (%s)" % ", ".join(r["models"])]
+    for key, d in r["dimensions"].items():
+        levels = ", ".join("-" if x.get("level") is None else str(x["level"]) for x in d["reviews"])
+        mark = "  " if d["consensus"] in (None, d["static"]) else "! "
+        first = next((x for x in d["reviews"] if x.get("level") is not None), None)
+        why = (first["rationale"][:110] + ("..." if len(first["rationale"]) > 110 else "")) if first else ""
+        out.append("  %s%-14s static %d -> reviewed %s  [%s]  %s"
+                   % (mark, key, d["static"], "-" if d["consensus"] is None else d["consensus"], levels, why))
+    if r.get("reviewed_index") is not None:
+        out.append("  Reviewed integrability index: %.2f" % r["reviewed_index"])
+    if r["disagreements"]:
+        out.append("  Disagreements to calibrate: " + ", ".join(r["disagreements"]))
     return out
 
 

@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover
     anthropic = None
 
 from neosloc.agentic import Probe, select
+from neosloc.agentic.llm import AnthropicBackend
 from neosloc.repo import Repo
 
 REPLIES = [
@@ -74,7 +75,8 @@ class SdkContract(unittest.TestCase):
     def test_round_trip(self):
         client = anthropic.Anthropic(api_key="test", max_retries=0,
                                      base_url="http://127.0.0.1:%d" % self.server.server_port)
-        rec = Probe(Repo(self.dir), client, log=lambda s: None).run_task(select(["run"])[0], "docs")
+        backend = AnthropicBackend("claude-opus-5-5", client=client)
+        rec = Probe(Repo(self.dir), backend, log=lambda s: None).run_task(select(["run"])[0], "docs")
         first, second = self.seen
         self.assertTrue(first["path"].startswith("/v1/messages"))
         self.assertEqual(first["beta"], "server-side-fallback-2026-07-01")

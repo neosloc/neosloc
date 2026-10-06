@@ -1,19 +1,61 @@
 name: ci
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   test:
+    name: test (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python: ["3.8", "3.12"]
+        # 3.8 is the floor for the dependency-free core; the anthropic SDK
+        # (and its contract test) needs 3.10+.
+        python: ["3.8", "3.10", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # stability and value read git history
+      - uses: astral-sh/setup-uv@v10
+      - name: Unit tests
+        run: |
+          extra=""
+          if [ "${{ matrix.python }}" != "3.8" ]; then extra="--with anthropic"; fi
+          uv run --no-project --python ${{ matrix.python }} $extra \
+            python -m unittest discover -v -s tests -t .
+      - name: Assess this repository
+        run: uv run --no-project --python ${{ matrix.python }} python -m neosloc .
+
+  package:
+    name: build and install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - if: matrix.python != '3.8'
-        run: pip install anthropic
-      - run: python -m unittest discover -v -s tests -t .
-      - run: python -m neosloc .
+      - uses: astral-sh/setup-uv@v10
+      - name: Build sdist and wheel
+        run: uv build
+      - name: Check metadata
+        run: uvx twine check --strict dist/*
+      - name: Install the wheel and run the `neosloc` command
+        run: |
+          uv venv --python 3.12 /tmp/venv
+          uv pip install --python /tmp/venv/bin/python dist/*.whl
+          /tmp/venv/bin/neosloc --version
+          /tmp/venv/bin/neosloc --json . > /tmp/report.json
+          python3 -c "import json; r=json.load(open('/tmp/report.json')); assert len(r['dimensions']) == 10, r"
+
+  docs:
+    name: docs build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - run: uv run --no-project --python 3.12 --with-requirements docs/requirements.txt mkdocs build --strict

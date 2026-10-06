@@ -51,6 +51,8 @@ class Report:
     not_implemented: List[str]
     value: Optional[Dict[str, Any]] = None
     agentic: Optional[Dict[str, Any]] = None
+    review: Optional[Dict[str, Any]] = None
+    spend: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -61,6 +63,8 @@ class Report:
             "not_implemented": self.not_implemented,
             "value": self.value,
             "agentic": self.agentic,
+            "review": self.review,
+            "spend": self.spend,
         }
 
 

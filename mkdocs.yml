@@ -1,0 +1,53 @@
+site_name: neosloc
+site_description: Integrability evaluation for software repositories, and what a codebase is worth when code is cheap.
+site_url: https://sirmmo.github.io/neosloc/
+repo_url: https://github.com/sirmmo/neosloc
+repo_name: sirmmo/neosloc
+edit_uri: edit/main/docs/
+copyright: MIT License
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle: {icon: material/weather-sunny, name: Light mode}
+
+hooks:
+  - docs/hooks.py
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: {permalink: true}
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed: {alternate_style: true}
+  - pymdownx.snippets: {base_path: ["."], check_paths: true}
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Concepts:
+      - Dimensions: dimensions.md
+      - Retrofit effort: estimate.md
+      - "Value: neoCOCOMO": value.md
+  - LLM evaluators:
+      - Probe, judge, review: evaluators.md
+      - Using OpenRouter: openrouter.md
+  - Reference:
+      - Command line: cli.md
+      - JSON report: json.md
+  - Contributing:
+      - Writing detectors: extending.md
+      - Calibration and limits: calibration.md
+  - Changelog: changelog.md

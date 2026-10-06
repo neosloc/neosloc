@@ -8,7 +8,8 @@ import unittest
 from types import SimpleNamespace as NS
 
 from neosloc.agentic.grader import Grader, normalize_path
-from neosloc.agentic.runner import Probe, cost_usd, level_from_rate
+from neosloc.agentic.llm import AnthropicBackend, Budget, anthropic_cost
+from neosloc.agentic.runner import Probe, level_from_rate
 from neosloc.agentic.tasks import TASKS, select
 from neosloc.agentic.workspace import ToolError, Workspace
 from neosloc.repo import Repo
@@ -156,7 +157,10 @@ class Scope(Base):
 class Loop(Base):
     def probe(self, script, **kw):
         client = FakeClient(script)
-        return Probe(self.repo, client, route_files=["items/api.py"], log=lambda s: None, **kw), client
+        budget = Budget(kw.pop("max_cost", 5.0))
+        backend = AnthropicBackend("claude-opus-5-5", client=client)
+        return Probe(self.repo, backend, budget=budget, route_files=["items/api.py"],
+                     log=lambda s: None, **kw), client
 
     def test_solved_task(self):
         script = [
@@ -211,7 +215,7 @@ class Loop(Base):
 
         client = FakeClient([])
         client.beta = NS(messages=NS(create=lambda **kw: (_ for _ in ()).throw(AuthenticationError("401"))))
-        probe = Probe(self.repo, client, log=lambda s: None)
+        probe = Probe(self.repo, AnthropicBackend("claude-opus-5-5", client=client), log=lambda s: None)
         with self.assertRaises(SystemExit):
             probe.run(TASKS, ["docs"])
 
@@ -242,7 +246,7 @@ class Loop(Base):
         out_dir = os.path.join(self.dir, "tr")
         probe, _ = self.probe(script, transcripts=out_dir)
         probe.run_task(TASKS[0], "docs")
-        with open(os.path.join(out_dir, "docs-auth.json")) as fh:
+        with open(os.path.join(out_dir, "anthropic_claude-opus-5-5-docs-auth.json")) as fh:
             self.assertEqual(json.load(fh)["result"]["outcome"], "infeasible")
 
 
@@ -294,8 +298,8 @@ class Pricing(unittest.TestCase):
     def test_cost(self):
         u = {"input_tokens": 1_000_000, "output_tokens": 100_000, "cache_read_input_tokens": 1_000_000,
              "cache_creation_input_tokens": 0}
-        self.assertAlmostEqual(cost_usd("claude-opus-5-5", u), 4.0 + 2.0 + 0.2)
-        self.assertIsNone(cost_usd("unknown-model", u))
+        self.assertAlmostEqual(anthropic_cost("claude-opus-5-5", u), 4.0 + 2.0 + 0.2)
+        self.assertIsNone(anthropic_cost("unknown-model", u))
 
     def test_levels(self):
         self.assertEqual([level_from_rate(r) for r in (0, 0.1, 0.5, 0.7, 0.9)], [0, 1, 2, 3, 4])

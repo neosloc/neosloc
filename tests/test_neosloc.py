@@ -160,6 +160,10 @@ class FastAPIService(Fixture):
         leg = self.dim(analyze(self.dir), "legibility")
         self.assertEqual(leg.metrics["import_cycles"], 0)
 
+    def test_inventory_tokens_without_legibility(self):
+        r = analyze(self.dir, only=["interface"], with_value=False)
+        self.assertGreater(r.inventory["source_tokens"], 0)
+
     def test_json_roundtrip(self):
         json.dumps(analyze(self.dir).to_dict())
 
