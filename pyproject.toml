@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "neosloc"
+version = "0.1.0"
+description = "Integrability evaluation for software repositories: what SLOC measured, re-asked for the age of LLMs."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+dependencies = []
+
+[project.scripts]
+neosloc = "neosloc.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["neosloc*"]
