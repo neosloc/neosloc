@@ -205,6 +205,16 @@ class Loop(Base):
         probe, _ = self.probe([response([], stop="refusal")])
         self.assertEqual(probe.run_task(TASKS[0], "docs")["outcome"], "refusal")
 
+    def test_missing_credentials_abort_the_run(self):
+        class AuthenticationError(Exception):
+            pass
+
+        client = FakeClient([])
+        client.beta = NS(messages=NS(create=lambda **kw: (_ for _ in ()).throw(AuthenticationError("401"))))
+        probe = Probe(self.repo, client, log=lambda s: None)
+        with self.assertRaises(SystemExit):
+            probe.run(TASKS, ["docs"])
+
     def test_turn_limit(self):
         loop = [response([tool_use("t%d" % i, "list_files", {"pattern": None})]) for i in range(3)]
         probe, _ = self.probe(loop, max_turns=3)

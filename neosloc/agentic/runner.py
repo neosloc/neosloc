@@ -77,6 +77,12 @@ def cost_usd(model: str, usage: Dict[str, int]) -> Optional[float]:
             + usage["cache_read_input_tokens"] * pread + usage["output_tokens"] * pout) / 1e6
 
 
+def _is_auth_failure(e: Exception) -> bool:
+    name = type(e).__name__
+    return (name in ("AuthenticationError", "PermissionDeniedError")
+            or (isinstance(e, TypeError) and "authentication method" in str(e)))
+
+
 def level_from_rate(rate: float) -> int:
     if rate >= 0.85:
         return 4
@@ -163,7 +169,10 @@ class Probe:
                     results.append({"type": "tool_result", "tool_use_id": c.id, "content": out,
                                     **({"is_error": True} if err else {})})
                 messages.append({"role": "user", "content": results})
-        except Exception as e:  # API failures end the task, not the run
+        except Exception as e:  # API failures end the task, not the run...
+            if _is_auth_failure(e):  # ...unless every task would fail the same way
+                raise SystemExit("neosloc: the Claude API rejected the credentials: %s\n"
+                                 "Set ANTHROPIC_API_KEY (or another credential the SDK accepts)." % e)
             rec["outcome"] = "error"
             rec["problems"].append("%s: %s" % (type(e).__name__, e))
 
