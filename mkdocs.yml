@@ -8,6 +8,8 @@ copyright: MIT License
 
 theme:
   name: material
+  logo: assets/logo-mark.svg
+  favicon: assets/logo-mark.svg
   features:
     - navigation.sections
     - navigation.top

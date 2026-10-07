@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 520" width="1040" height="520" role="img" aria-labelledby="t">
+  <defs><clipPath id="net"><rect x="732" y="0" width="308" height="520"/></clipPath></defs>
+  <title id="t">neosloc</title>
+  <g fill="#01DFBE">
+    <!-- speed lines -->
+    <rect x="56" y="50" width="118" height="38" rx="19"/>
+    <rect x="206" y="50" width="116" height="38" rx="19"/>
+    <rect x="107" y="145" width="124" height="38" rx="19"/>
+    <rect x="262" y="145" width="60" height="38" rx="19"/>
+    <rect x="15" y="239" width="59" height="38" rx="19"/>
+    <rect x="106" y="239" width="38" height="38" rx="19"/>
+    <rect x="175" y="239" width="147" height="38" rx="19"/>
+    <rect x="176" y="334" width="55" height="38" rx="19"/>
+    <rect x="262" y="334" width="60" height="38" rx="19"/>
+    <rect x="91" y="429" width="83" height="38" rx="19"/>
+    <!-- N (its lower-left end is rounded like the speed lines) -->
+    <circle cx="225" cy="448" r="19"/>
+    <rect x="225" y="429" width="40" height="38"/>
+    <path d="M273 466.5 L218 465.5 L213.5 463 L206.5 454 L206.5 440 L213 431.5 L219 428.5 L426 428.5 L427.5 427 L428 160.5 L629.5 424 L634 428.5 L669 428.5 L670.5 427 L670.5 89 L669 87.5 L631 87.5 L629.5 89 L629 356.5 L425.5 92 L421 87.5 L387 87.5 L385.5 89 L385.5 402 L350 402.5 L348.5 401 L349 49.5 L439 49.5 L591 247.5 L592.5 246 L592.5 50 L707.5 50 L707 465.5 L616 465.5 L466 271.5 L464.5 273 L464.5 465 Z"/>
+  </g>
+  <g clip-path="url(#net)" stroke="#0364FD" stroke-width="15.6" stroke-linecap="butt">
+    <!-- network edges -->
+    <line x1="825" y1="45" x2="957" y2="148"/>
+    <line x1="825" y1="45" x2="825" y2="177"/>
+    <line x1="957" y1="148" x2="825" y2="177"/>
+    <line x1="957" y1="148" x2="993" y2="258"/>
+    <line x1="957" y1="148" x2="825" y2="337"/>
+    <line x1="825" y1="177" x2="993" y2="258"/>
+    <line x1="993" y1="258" x2="825" y2="337"/>
+    <line x1="993" y1="258" x2="957" y2="368"/>
+    <line x1="825" y1="337" x2="957" y2="368"/>
+    <line x1="825" y1="337" x2="825" y2="471"/>
+    <line x1="957" y1="368" x2="825" y2="471"/>
+    <!-- spokes to the N -->
+    <line x1="825" y1="45" x2="733" y2="61.2"/>
+    <line x1="825" y1="177" x2="733" y2="261.3"/>
+    <line x1="825" y1="177" x2="733" y2="114.9"/>
+    <line x1="825" y1="337" x2="733" y2="391.2"/>
+    <line x1="825" y1="337" x2="733" y2="315.8"/>
+    <line x1="825" y1="337" x2="733" y2="189.8"/>
+    <line x1="825" y1="471" x2="733" y2="453.9"/>
+  </g>
+  <g fill="#0364FD">
+    <!-- network nodes -->
+    <circle cx="825" cy="45" r="36"/>
+    <circle cx="957" cy="148" r="36"/>
+    <circle cx="825" cy="177" r="36"/>
+    <circle cx="993" cy="258" r="36"/>
+    <circle cx="825" cy="337" r="36"/>
+    <circle cx="957" cy="368" r="36"/>
+    <circle cx="825" cy="471" r="36"/>
+  </g>
+</svg>
