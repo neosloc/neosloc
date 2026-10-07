@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Optional
 
+from ..errors import EvaluatorError
 from .llm import AuthFailure, Budget, empty_usage, validate
 from .workspace import ToolError
 
@@ -72,8 +73,8 @@ def run_loop(conv: Any, prompt: str, execute: Callable[[str, Dict], str], submit
                     res.tool_errors += 1
             conv.send_tool_results(results)
     except AuthFailure as e:
-        raise SystemExit("neosloc: the model provider rejected the credentials: %s\n"
-                         "Set ANTHROPIC_API_KEY or OPENROUTER_API_KEY for the provider you chose." % e)
+        raise EvaluatorError("credentials", "the model provider rejected the credentials: %s. Set "
+                             "ANTHROPIC_API_KEY or OPENROUTER_API_KEY for the provider you chose." % e)
     except Exception as e:  # API failures end this task, not the run
         res.outcome, res.error = "error", "%s: %s" % (type(e).__name__, e)
     return res

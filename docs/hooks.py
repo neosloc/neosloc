@@ -3,6 +3,8 @@
     <!-- neosloc:signals events -->   the signal table and level texts of a detector
     <!-- neosloc:cli -->              `neosloc --help`
     <!-- neosloc:tasks -->            the agentic task suite
+    <!-- neosloc:schema -->           `neosloc --schema`
+    <!-- neosloc:errors -->           error codes and exit statuses
 """
 import importlib
 import io
@@ -45,6 +47,18 @@ def _tasks():
     return "\n".join(rows)
 
 
+def _schema():
+    from neosloc.schema import dumps
+    return "```json\n" + dumps() + "\n```"
+
+
+def _errors():
+    from neosloc.schema import ERROR_CODES
+    rows = ["| `code` | Meaning |", "|---|---|"]
+    rows += ["| `%s` | %s |" % (k, v) for k, v in ERROR_CODES.items()]
+    return "\n".join(rows)
+
+
 def on_page_markdown(markdown, **kwargs):
     # MkDocs resets sys.path after loading hooks, so make the package importable here.
     if ROOT not in sys.path:
@@ -58,5 +72,9 @@ def on_page_markdown(markdown, **kwargs):
             return _cli()
         if kind == "tasks":
             return _tasks()
+        if kind == "schema":
+            return _schema()
+        if kind == "errors":
+            return _errors()
         raise ValueError("unknown neosloc marker %r" % kind)
     return MARK.sub(render, markdown)

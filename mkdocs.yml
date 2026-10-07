@@ -39,6 +39,7 @@ nav:
   - Getting started: getting-started.md
   - Concepts:
       - Dimensions: dimensions.md
+      - "Criteria (proposal)": criteria.md
       - Retrofit effort: estimate.md
       - "Value: neoCOCOMO": value.md
   - LLM evaluators:
@@ -46,7 +47,7 @@ nav:
       - Using OpenRouter: openrouter.md
   - Reference:
       - Command line: cli.md
-      - JSON report: json.md
+      - JSON output and schema: json.md
   - Contributing:
       - Writing detectors: extending.md
       - Calibration and limits: calibration.md

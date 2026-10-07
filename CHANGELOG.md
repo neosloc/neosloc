@@ -3,6 +3,25 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## 0.4.0
+
+- **JSON Schema for `--json` output**, printed by `neosloc --schema` and published in the
+  docs. Every document now has `schema_version` (1).
+- **Errors are JSON with `--json`:** `{"schema_version": 1, "error": {"code", "message",
+  "exit_status", "details"}}` on stdout, for usage errors, bad paths, evaluator setup
+  failures, interrupts and internal errors alike. With several paths, failed paths become
+  error entries in the list and the other reports are kept.
+- **Exit statuses distinguish error classes:** 1 internal, 2 usage, 3 path, 4 evaluator
+  setup, 130 interrupted. **Breaking:** a missing path used to exit 2; it now exits 3.
+- **Diagnostics are logged** on stderr through the `neosloc` logger: `--log-level
+  debug|info|warning|error`, `NEOSLOC_LOG_LEVEL`, `-q/--quiet`, and `--log-format json`
+  for one JSON object per line. Debug level shows per-detector levels and timings.
+- `--only` now rejects unknown dimension keys (`unknown_dimension`) instead of ignoring them.
+- Library API: evaluator failures raise `neosloc.errors.EvaluatorError` (with a `code`)
+  instead of `SystemExit`.
+- Tests: 87 → 116; line coverage 87% → 93%, with a 90% floor in CI and full schema
+  validation of real output.
+
 ## 0.3.1
 
 - **Scoring fix:** content signals now match a *code view* that drops comments,

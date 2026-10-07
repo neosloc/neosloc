@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import time
 from typing import Any, Callable, Dict, List, Optional
 
+from ..log import logger
 from ..repo import Repo
 from .grader import Grader
 from .llm import Budget
@@ -58,7 +58,8 @@ class Probe:
         self.judge = judge
         self.transcripts = transcripts
         self.grader = Grader(repo, route_files)
-        self.log = log or (lambda s: print(s, file=sys.stderr))
+        self.log = log or logger.info
+        self.warn = log or logger.warning
 
     def run_task(self, task: Task, scope: str) -> Dict:
         ws = Workspace(self.repo, scope, self.base_url, self.allow_writes, self.auth_headers)
@@ -111,13 +112,13 @@ class Probe:
         for scope in scopes:
             for task in tasks:
                 if self.budget.exhausted:
-                    self.log("neosloc: budget of $%.2f reached; skipping %s/%s"
+                    self.warn("budget of $%.2f reached; skipping %s/%s"
                              % (self.budget.max_usd, scope, task.key))
                     records.append(_skipped(task, scope, self.backend.label))
                     continue
-                self.log("neosloc: probe %s %s/%s ..." % (self.backend.label, scope, task.key))
+                self.log("probe %s %s/%s ..." % (self.backend.label, scope, task.key))
                 rec = self.run_task(task, scope)
-                self.log("neosloc:   %s (%d turns, $%.2f spent so far)"
+                self.log("  %s (%d turns, $%.2f spent so far)"
                          % (rec["outcome"], rec["turns"], self.budget.spent))
                 records.append(rec)
         return summarize(records, self.backend.label, getattr(self.backend, "effort", None), scopes,

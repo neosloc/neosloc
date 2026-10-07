@@ -1,22 +1,39 @@
-"""Command-line entry point: `neosloc [--json] [-v] PATH...`."""
+"""Command-line entry point: `neosloc [options] PATH...`.
+
+Reports go to stdout (text, or JSON with --json); diagnostics go to stderr
+through the `neosloc` logger. With --json every outcome, including errors, is
+a JSON document on stdout that validates against `neosloc --schema`.
+"""
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import sys
-from typing import List, Optional
+import time
+from typing import Any, Dict, List, Optional
 
 from . import __version__
 from .detectors import DIMENSIONS
+from .errors import (EXIT_INTERRUPTED, EXIT_OK, EXIT_PATH, InternalError, NeoslocError, PathError,
+                     UsageError)
 from .estimate import estimate
+from .log import LEVELS, configure, logger
 from .model import Report
 from .repo import Repo, estimate_tokens
-from .value import SLOCCOUNT_OVERHEAD, SLOCCOUNT_SALARY, value
 from .report import to_text
+from .schema import SCHEMA_VERSION, dumps as schema_dumps
+from .value import SLOCCOUNT_OVERHEAD, SLOCCOUNT_SALARY, value
 
 
 def analyze(path: str, only: Optional[List[str]] = None, salary: float = SLOCCOUNT_SALARY,
             overhead: float = SLOCCOUNT_OVERHEAD, with_value: bool = True) -> Report:
-    repo = Repo(path)
+    started = time.time()
+    try:
+        repo = Repo(path)
+    except (NotADirectoryError, FileNotFoundError):
+        raise PathError("not_a_directory", "not a directory: %s" % path, {"path": path})
+    logger.debug("inventory: %d files", len(repo.files), extra={"files": len(repo.files), "git": repo.is_git})
     ctx: dict = {}
     results, skipped = [], []
     for key, title, fn in DIMENSIONS:
@@ -25,7 +42,10 @@ def analyze(path: str, only: Optional[List[str]] = None, salary: float = SLOCCOU
         if fn is None:
             skipped.append(key)
             continue
+        t = time.time()
         results.append(fn(repo, ctx))
+        logger.debug("detector %s: level %d in %.2fs", key, results[-1].level, time.time() - t,
+                     extra={"detector": key, "dimension_level": results[-1].level, "seconds": round(time.time() - t, 3)})
 
     leg = next((d for d in results if d.key == "legibility"), None)
     langs = leg.metrics.get("languages", {}) if leg else {}
@@ -42,6 +62,8 @@ def analyze(path: str, only: Optional[List[str]] = None, salary: float = SLOCCOU
     report = Report(repo.root, inventory, results, estimate(results, src_tokens), skipped)
     if with_value:
         report.value = value(repo, results, salary, overhead)
+    logger.debug("assessed %s in %.2fs", repo.root, time.time() - started,
+                 extra={"target": repo.root, "seconds": round(time.time() - started, 3)})
     return report
 
 
@@ -62,17 +84,14 @@ def run_evaluators(path: str, report: Report, args) -> None:
 
     def backend(spec):
         if spec not in backends:
-            try:
-                backends[spec] = make_backend(spec, effort, fallbacks=not args.no_fallbacks)
-            except ValueError as e:
-                raise SystemExit("neosloc: %s" % e)
+            backends[spec] = make_backend(spec, effort, fallbacks=not args.no_fallbacks)
         return backends[spec]
 
     if args.agentic or args.judge:
         try:
             tasks = select(args.tasks.split(",") if args.tasks else None)
         except ValueError as e:
-            raise SystemExit("neosloc: %s" % e)
+            raise UsageError("unknown_task", str(e), {"tasks": args.tasks})
         headers = {}
         for h in args.auth_header:
             k, _, v = h.partition(":")
@@ -98,19 +117,38 @@ def run_evaluators(path: str, report: Report, args) -> None:
                     "unpriced_calls": budget.unpriced_calls}
 
 
-def main(argv: Optional[List[str]] = None) -> int:
-    ap = argparse.ArgumentParser(
+class _Parser(argparse.ArgumentParser):
+    """argparse that raises UsageError instead of printing and exiting."""
+
+    def error(self, message):
+        raise UsageError("usage", message, {"usage": self.format_usage().strip()})
+
+
+def build_parser() -> argparse.ArgumentParser:
+    ap = _Parser(
         prog="neosloc",
-        description="Integrability evaluation for software repositories.")
-    ap.add_argument("paths", nargs="+", help="repository directories to assess")
-    ap.add_argument("--json", action="store_true", help="emit JSON instead of text")
-    ap.add_argument("-v", "--verbose", action="store_true", help="show all evidence")
-    ap.add_argument("--only", help="comma-separated dimension keys to run")
-    ap.add_argument("--salary", type=float, default=SLOCCOUNT_SALARY,
-                    help="annual salary for cost figures (default: sloccount's %(default)s)")
-    ap.add_argument("--overhead", type=float, default=SLOCCOUNT_OVERHEAD,
-                    help="overhead multiplier on salary (default: %(default)s)")
-    ap.add_argument("--version", action="version", version="neosloc " + __version__)
+        description="Integrability evaluation for software repositories.",
+        epilog="Exit status: 0 ok, 1 internal error, 2 usage error, 3 a path could not be assessed, "
+               "4 LLM evaluator setup error (credentials, provider, model, SDK), 130 interrupted. "
+               "With --json, errors are JSON on stdout too; `neosloc --schema` describes every shape.")
+    ap.add_argument("paths", nargs="*", help="repository directories to assess")
+    out = ap.add_argument_group("output")
+    out.add_argument("--json", action="store_true", help="emit JSON (reports and errors) instead of text")
+    out.add_argument("--schema", action="store_true", help="print the JSON Schema of --json output and exit")
+    out.add_argument("-v", "--verbose", action="store_true", help="show all evidence in the text report")
+    out.add_argument("--only", help="comma-separated dimension keys to run (%s)" % ", ".join(k for k, _, _ in DIMENSIONS))
+    out.add_argument("--salary", type=float, default=SLOCCOUNT_SALARY,
+                     help="annual salary for cost figures (default: sloccount's %(default)s)")
+    out.add_argument("--overhead", type=float, default=SLOCCOUNT_OVERHEAD,
+                     help="overhead multiplier on salary (default: %(default)s)")
+    out.add_argument("--version", action="version", version="neosloc " + __version__)
+    lg = ap.add_argument_group("diagnostics (stderr)")
+    lg.add_argument("--log-level", choices=list(LEVELS), default=None,
+                    help="debug: detector timings; info (default): evaluator progress; warning; error. "
+                         "Also NEOSLOC_LOG_LEVEL.")
+    lg.add_argument("-q", "--quiet", action="store_true", help="only errors on stderr (same as --log-level error)")
+    lg.add_argument("--log-format", choices=["text", "json"], default="text",
+                    help="text (default) or one JSON object per line")
     ag = ap.add_argument_group(
         "LLM evaluators (call model APIs and cost money)",
         "Models are written provider:model, e.g. anthropic:claude-opus-5-5 or "
@@ -144,28 +182,81 @@ def main(argv: Optional[List[str]] = None) -> int:
     ag.add_argument("--no-fallbacks", action="store_true",
                     help="don't let the API retry refused requests on a fallback model")
     ag.add_argument("--transcripts", help="directory to save per-task transcripts")
-    args = ap.parse_args(argv)
+    return ap
 
-    only = args.only.split(",") if args.only else None
+
+def _error_doc(err: NeoslocError, target: Optional[str] = None) -> Dict[str, Any]:
+    doc: Dict[str, Any] = {"schema_version": SCHEMA_VERSION, "error": err.to_dict()}
+    if target is not None:
+        doc["target"] = target
+    return doc
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    want_json = "--json" in argv
+    try:
+        return _main(argv)
+    except NeoslocError as e:
+        err = e
+    except KeyboardInterrupt:
+        err = NeoslocError("interrupted", "interrupted")
+        err.exit_status = EXIT_INTERRUPTED
+    except Exception as e:  # a bug: report it in the same shape, with the traceback at debug level
+        logger.debug("internal error", exc_info=True)
+        err = InternalError("internal", "%s: %s" % (type(e).__name__, e), {"type": type(e).__name__})
+    if want_json:
+        target = err.details.get("path") if isinstance(err, PathError) else None
+        print(json.dumps(_error_doc(err, target), indent=2))
+    if not logger.handlers:  # failed before logging was configured
+        configure("error")
+    logger.error(err.message, extra={"code": err.code, "exit_status": err.exit_status})
+    return err.exit_status
+
+
+def _main(argv: List[str]) -> int:
+    ap = build_parser()
+    args = ap.parse_args(argv)
+    level = "error" if args.quiet else (args.log_level or os.environ.get("NEOSLOC_LOG_LEVEL", "info").lower())
+    if level not in LEVELS:
+        raise UsageError("usage", "NEOSLOC_LOG_LEVEL must be one of %s" % ", ".join(LEVELS))
+    configure(level, args.log_format)
+
+    if args.schema:
+        print(schema_dumps())
+        return EXIT_OK
+    if not args.paths:
+        raise UsageError("usage", "the following arguments are required: paths", {"usage": ap.format_usage().strip()})
+    only = [k.strip() for k in args.only.split(",")] if args.only else None
+    if only:
+        unknown = [k for k in only if k not in {key for key, _, _ in DIMENSIONS}]
+        if unknown:
+            raise UsageError("unknown_dimension", "unknown dimension(s): %s" % ", ".join(unknown),
+                             {"unknown": unknown, "known": [k for k, _, _ in DIMENSIONS]})
     evaluating = args.agentic or args.judge or args.review
     if evaluating and len(args.paths) > 1:
-        ap.error("--agentic/--judge/--review take a single path")
-    reports = []
-    status = 0
+        raise UsageError("usage", "--agentic/--judge/--review take a single path")
+
+    results: List[Any] = []   # Report or (path, PathError)
     for p in args.paths:
         try:
             report = analyze(p, only, args.salary, args.overhead)
-            if evaluating:
-                run_evaluators(p, report, args)
-            reports.append(report)
-        except NotADirectoryError:
-            print("neosloc: not a directory: %s" % p, file=sys.stderr)
-            status = 2
+        except PathError as e:
+            if len(args.paths) == 1:
+                raise
+            logger.error(e.message, extra={"code": e.code, "target": p})
+            results.append((p, e))
+            continue
+        if evaluating:
+            run_evaluators(p, report, args)
+        results.append(report)
 
+    failed = [r for r in results if isinstance(r, tuple)]
     if args.json:
-        import json
-        payload = [r.to_dict() for r in reports]
-        print(json.dumps(payload[0] if len(payload) == 1 else payload, indent=2))
+        docs = [_error_doc(r[1], r[0]) if isinstance(r, tuple) else r.to_dict() for r in results]
+        print(json.dumps(docs[0] if len(docs) == 1 else docs, indent=2))
     else:
-        print(("\n\n" + "=" * 72 + "\n\n").join(to_text(r, args.verbose) for r in reports))
-    return status
+        texts = [to_text(r, args.verbose) for r in results if not isinstance(r, tuple)]
+        if texts:
+            print(("\n\n" + "=" * 72 + "\n\n").join(texts))
+    return EXIT_PATH if failed else EXIT_OK

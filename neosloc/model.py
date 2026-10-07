@@ -55,7 +55,9 @@ class Report:
     spend: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        from .schema import SCHEMA_VERSION
         return {
+            "schema_version": SCHEMA_VERSION,
             "target": self.target,
             "inventory": self.inventory,
             "dimensions": [d.to_dict() for d in self.dimensions],

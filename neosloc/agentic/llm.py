@@ -21,6 +21,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..errors import EvaluatorError, UsageError
+
 # ---------------------------------------------------------------------------
 # Shared types
 
@@ -174,10 +176,11 @@ class AnthropicBackend:
             try:
                 import anthropic
             except ImportError:
-                raise SystemExit(
-                    "neosloc: anthropic models need the anthropic SDK (Python >= 3.10):\n"
-                    "  pip install 'neosloc[agentic]'\n"
-                    "or use an OpenRouter model (openrouter:<vendor/model>), which needs no extra package.")
+                raise EvaluatorError(
+                    "missing_dependency",
+                    "anthropic models need the anthropic SDK (Python >= 3.10): pip install 'neosloc[agentic]', "
+                    "or use an OpenRouter model (openrouter:<vendor/model>), which needs no extra package",
+                    {"package": "anthropic", "extra": "agentic"})
             self.client = anthropic.Anthropic()
 
     @property
@@ -289,17 +292,21 @@ class OpenRouterBackend:
     def __post_init__(self):
         self.api_key = self.api_key or os.environ.get("OPENROUTER_API_KEY")
         if not self.api_key:
-            raise AuthFailure("OPENROUTER_API_KEY is not set")
+            raise EvaluatorError("credentials", "OPENROUTER_API_KEY is not set",
+                                 {"provider": "openrouter", "env": "OPENROUTER_API_KEY"})
         try:
             info = openrouter_models(self.base_url).get(self.model)
         except (urllib.error.URLError, OSError, ValueError) as e:
-            raise SystemExit("neosloc: could not reach OpenRouter to look up %s: %s" % (self.model, e))
+            raise EvaluatorError("provider_unreachable", "could not reach OpenRouter to look up %s: %s"
+                                 % (self.model, e), {"provider": "openrouter", "model": self.model})
         if info is None:
-            raise SystemExit("neosloc: OpenRouter has no model %r (see https://openrouter.ai/models)" % self.model)
+            raise EvaluatorError("unknown_model", "OpenRouter has no model %r (see https://openrouter.ai/models)"
+                                 % self.model, {"provider": "openrouter", "model": self.model})
         self.supported = info.get("supported_parameters") or []
         if "tools" not in self.supported:
-            raise SystemExit("neosloc: %s does not support tool calling on OpenRouter; pick a model that does"
-                             % self.model)
+            raise EvaluatorError("model_unsupported", "%s does not support tool calling on OpenRouter; "
+                                 "pick a model that does" % self.model,
+                                 {"provider": "openrouter", "model": self.model})
         self.pricing = {k: float(v) for k, v in (info.get("pricing") or {}).items()
                         if k in ("prompt", "completion", "input_cache_read") and v not in (None, "")}
 
@@ -345,13 +352,13 @@ class OpenRouterBackend:
 
 
 def make_backend(spec: str, effort: str = "medium", fallbacks: bool = True):
-    provider, model = parse_spec(spec)
     try:
-        if provider == "anthropic":
-            return AnthropicBackend(model, effort, fallbacks)
-        return OpenRouterBackend(model, effort)
-    except AuthFailure as e:
-        raise SystemExit("neosloc: %s" % e)
+        provider, model = parse_spec(spec)
+    except ValueError as e:
+        raise UsageError("bad_model_spec", str(e), {"spec": spec})
+    if provider == "anthropic":
+        return AnthropicBackend(model, effort, fallbacks)
+    return OpenRouterBackend(model, effort)
 
 
 # ---------------------------------------------------------------------------

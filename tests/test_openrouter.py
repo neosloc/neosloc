@@ -115,11 +115,22 @@ class Validation(unittest.TestCase):
 
 class Backend(Base):
     def test_model_checks(self):
+        from neosloc.errors import EvaluatorError
         m = self.mock([])
-        with self.assertRaises(SystemExit):
+        with self.assertRaises(EvaluatorError) as cm:
             self.backend(m, "acme/chatty")  # no tool support
-        with self.assertRaises(SystemExit):
+        self.assertEqual(cm.exception.code, "model_unsupported")
+        with self.assertRaises(EvaluatorError) as cm:
             self.backend(m, "acme/missing")
+        self.assertEqual(cm.exception.code, "unknown_model")
+
+    def test_unreachable_provider(self):
+        from neosloc.agentic import llm
+        from neosloc.errors import EvaluatorError
+        llm._MODEL_CACHE.pop("http://127.0.0.1:9/api/v1", None)
+        with self.assertRaises(EvaluatorError) as cm:
+            OpenRouterBackend("acme/tooler", api_key="k", base_url="http://127.0.0.1:9/api/v1", retries=0)
+        self.assertEqual(cm.exception.code, "provider_unreachable")
 
     def test_auth_failure(self):
         m = self.mock([], status=401)
@@ -262,6 +273,8 @@ class CliWiring(Base):
                       "--effort", "low", "--json"])
         self.assertEqual(specs, [("openrouter:acme/tooler", "low"), ("openrouter:acme/other", "low")])
         data = json.loads(out.getvalue())
+        from tests.test_cli import validate
+        validate(data)  # agentic, review and spend sections match the published schema
         self.assertEqual(data["agentic"]["runs"][0]["tasks"][0]["outcome"], "infeasible")
         self.assertEqual(data["review"]["dimensions"]["interface"]["consensus"], 2)
         self.assertGreater(data["spend"]["usd"], 0)

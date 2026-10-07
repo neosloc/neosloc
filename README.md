@@ -95,6 +95,14 @@ shares one `--max-cost` budget (default $5), and the report states the total. Se
 [LLM evaluators](https://ingmmo.com/neosloc/evaluators/) and
 [Using OpenRouter](https://ingmmo.com/neosloc/openrouter/).
 
+## Scripting
+
+`--json` output (reports *and* errors) follows a published JSON Schema (`neosloc
+--schema`). Exit statuses distinguish error classes (2 usage, 3 path, 4 evaluator setup).
+Diagnostics go to stderr: `-q`, `--log-level`, `--log-format json`. See
+[JSON output](https://ingmmo.com/neosloc/json/) and
+[Command line](https://ingmmo.com/neosloc/cli/).
+
 ## Status
 
 All thresholds and coefficients are uncalibrated, so treat the numbers as rankings.

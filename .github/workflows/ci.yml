@@ -27,8 +27,11 @@ jobs:
         run: |
           extra=""
           if [ "${{ matrix.python }}" != "3.8" ]; then extra="--with anthropic"; fi
-          uv run --no-project --python ${{ matrix.python }} $extra \
-            python -m unittest discover -v -s tests -t .
+          uv run --no-project --python ${{ matrix.python }} $extra --with jsonschema --with coverage \
+            python -m coverage run --source=neosloc -m unittest discover -v -s tests -t .
+      - name: Coverage floor
+        if: matrix.python == '3.12'
+        run: uv run --no-project --python 3.12 --with coverage python -m coverage report --fail-under=90
       - name: Assess this repository
         run: uv run --no-project --python ${{ matrix.python }} python -m neosloc .
 
@@ -50,7 +53,14 @@ jobs:
           uv pip install --python /tmp/venv/bin/python dist/*.whl
           /tmp/venv/bin/neosloc --version
           /tmp/venv/bin/neosloc --json . > /tmp/report.json
-          python3 -c "import json; r=json.load(open('/tmp/report.json')); assert len(r['dimensions']) == 10, r"
+          /tmp/venv/bin/neosloc --schema > /tmp/schema.json
+          uv run --no-project --python 3.12 --with jsonschema python -c "
+          import json, jsonschema
+          jsonschema.Draft202012Validator(json.load(open('/tmp/schema.json'))).validate(json.load(open('/tmp/report.json')))
+          print('report validates against neosloc --schema')"
+          set +e; /tmp/venv/bin/neosloc --json /nonexistent > /tmp/error.json; status=$?; set -e
+          test "$status" = 3
+          python3 -c "import json; assert json.load(open('/tmp/error.json'))['error']['code'] == 'not_a_directory'"
 
   docs:
     name: docs build

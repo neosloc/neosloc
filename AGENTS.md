@@ -28,3 +28,7 @@
 - Never call real model APIs in tests; use the fake client in `tests/test_agentic.py`,
   the Messages API mock in `tests/test_sdk_contract.py` or the OpenRouter mock in
   `tests/test_openrouter.py`.
+- CLI contract: results on stdout, diagnostics on stderr via `neosloc.log.logger` (never
+  `print` to stderr). Failures raise a `neosloc.errors.NeoslocError` subclass with a code
+  listed in `schema.ERROR_CODES`; `cli.main` renders it (JSON with `--json`). Any change to
+  `--json` output must update `neosloc/schema.py`; the strict schema makes tests fail otherwise.

@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import json
 import statistics
-import sys
 from typing import Any, Callable, Dict, List, Optional
 
 from ..model import LEVEL_NAMES, DimensionResult
+from ..log import logger
 from ..repo import Repo
 from .llm import Budget
 from .loop import run_loop
@@ -95,15 +95,16 @@ class Reviewer:
 
 def review_all(repo: Repo, dims: List[DimensionResult], backends: List[Any], budget: Budget,
                log: Optional[Callable[[str], None]] = None) -> Dict:
-    log = log or (lambda s: print(s, file=sys.stderr))
+    warn = log or logger.warning
+    log = log or logger.info
     per_dim: Dict[str, Dict] = {}
     for dim in dims:
         reviews = []
         for b in backends:
             if budget.exhausted:
-                log("neosloc: budget reached; skipping review of %s by %s" % (dim.key, b.label))
+                warn("budget reached; skipping review of %s by %s" % (dim.key, b.label))
                 continue
-            log("neosloc: review %s by %s ..." % (dim.key, b.label))
+            log("review %s by %s ..." % (dim.key, b.label))
             reviews.append(Reviewer(repo, b, budget).review(dim))
         levels = [r["level"] for r in reviews if r.get("level") is not None]
         per_dim[dim.key] = {

@@ -216,8 +216,10 @@ class Loop(Base):
         client = FakeClient([])
         client.beta = NS(messages=NS(create=lambda **kw: (_ for _ in ()).throw(AuthenticationError("401"))))
         probe = Probe(self.repo, AnthropicBackend("claude-opus-5-5", client=client), log=lambda s: None)
-        with self.assertRaises(SystemExit):
+        from neosloc.errors import EvaluatorError
+        with self.assertRaises(EvaluatorError) as cm:
             probe.run(TASKS, ["docs"])
+        self.assertEqual(cm.exception.code, "credentials")
 
     def test_turn_limit(self):
         loop = [response([tool_use("t%d" % i, "list_files", {"pattern": None})]) for i in range(3)]
