@@ -23,7 +23,7 @@ from .model import Report
 from .repo import Repo
 from .report import to_text
 from .schema import SCHEMA_VERSION, dumps as schema_dumps
-from .makebuy import DEFAULT_MODEL as MAKE_MODEL, make_or_buy
+from .makebuy import DEFAULT_MODEL as MAKE_MODEL, make_or_buy, measured_adoption
 from .value import SLOCCOUNT_OVERHEAD, SLOCCOUNT_SALARY, value
 
 
@@ -102,6 +102,8 @@ def run_evaluators(path: str, report: Report, args) -> None:
     if args.review:
         report.review = review_all(repo, report.dimensions,
                                    [backend(s) for s in _specs(args.review_model, DEFAULT_MODEL)], budget)
+    if report.make_or_buy is not None and report.agentic is not None:
+        report.make_or_buy["buy"]["measured"] = measured_adoption(report.agentic)
     report.spend = {"usd": round(budget.spent, 4), "max_usd": budget.max_usd,
                     "unpriced_calls": budget.unpriced_calls}
 

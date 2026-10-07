@@ -6,11 +6,11 @@ and money, and gives a verdict:
 
 ```text
 Make or buy (over 3 years; see neosloc/makebuy.py)
-  Make with agents:  934k output + 23M input tokens (85% cached) on anthropic:claude-opus-5-5 = $37;
+  Make with agents:  934k output + 23.3M input tokens (85% cached) on anthropic:claude-opus-5-5 = $37;
                      10.4 agent-hours, 39.7 human days (14.1 steering + 25.6 rediscovering history), ~39.7 calendar days
                      build $21k, then $3k/year to maintain -> $31k
-  Buy (adopt this):  22.0 integration days, $5k/year price, 5.7 upgrade days/year -> $36k
-  Verdict:           TOSS-UP: within 1.5x either way (make/buy = 0.86); buying wins below $3k/year
+  Buy (adopt as is): 5 min to running (via service) + 4.0 h to first use (via service), $5k/year price, 8.0 h/year of upgrades -> $17k
+  Verdict:           BUY: adopting this is cheaper (make/buy = 1.83); buying wins below $10k/year
 ```
 
 ```bash
@@ -35,12 +35,31 @@ that nobody wrote down is what makes remaking expensive. On old projects this te
 dominates: the tokens cost tens of dollars, while rediscovering what 400 commits taught
 the authors takes weeks.
 
-## Buy: adopt this project
+## Buy: adopt it as it is
 
-| Quantity | Model |
-|---|---|
-| Integration days | the retrofit effort to level 3 of the dimensions a consumer depends on (everything but legibility: buyers don't change the code), plus 1 day of onboarding, both scaled with size |
-| Yearly | `--buy-price` (default 0, for open source) plus upgrade days: 6, 4, 3, 2 or 1 for contract stability 0–4, scaled with size |
+A buyer doesn't change the code. They install it and use its best way in, so buying costs
+**adoption time**, read off the project's own ladders:
+
+| Step | Read from | Minutes, level 0 → 4 |
+|---|---|---|
+| Getting it running | Embeddability level of its best surface | CLI or library: 240, 60, 15, 2, 1 (source only … published to a registry). Service: 960, 240, 60, 15, 5 (undocumented setup … container … compose/Helm) |
+| First successful use | Interface level | 2400 (× size; no programmatic surface: wrap the UI), 240, 60, 10, 2 (specified contract plus a second surface such as client libraries) |
+| Upgrades per year | Contract stability | 480, 240, 120, 30, 5 |
+
+So `pip install neosloc && neosloc .` costs minutes, and so does geomqtt
+(`docker compose up`, then any Redis/MQTT client or its published client libraries). The
+[retrofit estimate](estimate.md) is the *owner's* cost of making a project integrable,
+and isn't used here.
+
+**Measured adoption.** With `--agentic`, the probe's docs-only `run` (get it running) and
+`list` (first use) tasks are exactly the adoption steps, done by an agent. Their real
+time, tokens and cost are reported next to the estimate:
+
+```text
+  Measured:          the <model> probe succeeded at getting it running and a first call from the docs in <time> (<tokens> tokens)
+```
+
+`--buy-price` adds a price per year (default 0, for open source).
 
 ## Verdict
 
@@ -67,6 +86,9 @@ guesses, kept in `neosloc/makebuy.py` to be fitted.
     puts neosloc at about 1.9 person-months, roughly 20 times its real build time. The
     make estimate uses the token model above instead. Bringing neoCOCOMO's reproduce term
     in line with it is an open item.
+
+The adoption minutes are estimates per level, not yet compared with measured adoptions.
+Running the probe on a few projects is the way to fit them.
 
 Not modelled: licence terms, vendor risk, support, and the value of the vendor's roadmap.
 Treat the verdict as the cost side of the decision.

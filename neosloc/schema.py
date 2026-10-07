@@ -137,8 +137,15 @@ MAKE_OR_BUY = _obj({
     "make": _obj({"model": STR, "tokens": TOKENS, "final_tokens": INT, "model_cost": NULLABLE_NUM,
                   "agent_hours": NUM, "human_days": NUM, "review_days": NUM, "rediscover_days": NUM,
                   "calendar_days": NUM, "build_cost": NUM, "yearly_cost": NUM, "total_cost": NUM}),
-    "buy": _obj({"tokens": TOKENS, "model_cost": NULLABLE_NUM, "integration_days": NUM, "upgrade_days_per_year": NUM,
-                 "price_per_year": NUM, "fixed_cost": NUM, "yearly_cost": NUM, "total_cost": NUM}),
+    "buy": _obj({
+        "via": _obj({"install": {"type": ["string", "null"]}, "use": {"type": ["string", "null"]}}),
+        "adoption_minutes": _obj({"install": NUM, "first_use": NUM, "total": NUM}),
+        "tokens": TOKENS, "model_cost": NULLABLE_NUM, "upgrade_minutes_per_year": NUM,
+        "measured": {"oneOf": [{"type": "null"}, _obj({
+            "model": STR, "succeeded": {"type": "boolean"}, "outcomes": {"type": "object"},
+            "minutes": NUM, "tokens": INT, "cost_usd": NULLABLE_NUM})],
+            "description": "Adoption as the agentic probe measured it (docs-scope run + list tasks)."},
+        "price_per_year": NUM, "fixed_cost": NUM, "yearly_cost": NUM, "total_cost": NUM}),
     "assumptions": {"type": "object"},
 })
 

@@ -13,10 +13,16 @@ MAKE  tokens   final = code + tests needed to verify it + a spec for behaviour
       humans   final / REVIEW_TOKENS_PER_DAY x (1 + SPEC_DIFFICULTY x (1 - capture))
                + rediscovering uncaptured history (neoCOCOMO rediscover term)
       yearly   MAINTENANCE_SHARE of the build, every year
-BUY   humans   retrofit to level 3 of the dimensions a consumer depends on (estimate.py,
-               without legibility: buyers don't change the code) + onboarding
-      yearly   price (--buy-price) + upgrade days, fewer when contracts are stable;
-               onboarding and upgrades scale with size like the retrofit does
+BUY   adoption time to first use through the best surface, read off the ladders:
+               getting it running (embeddability level of its best surface: a
+               published CLI installs in a minute, a source-only service takes hours)
+               + first successful use (interface level: a specified contract with
+               client libraries takes minutes; no programmatic surface means wrapping
+               a UI, days). Measured by the agentic probe when it ran.
+      yearly   price (--buy-price) + upgrade time, by contract stability
+
+The retrofit estimate (estimate.py) is the *owner's* cost of making a project
+integrable; a buyer adopts it as it is, so it isn't used here.
 
 Calibration: REVIEW_TOKENS_PER_DAY is anchored on neosloc itself (~70k tokens of
 code and tests, built in about two days by one person directing an agent). The
@@ -42,9 +48,18 @@ TOOL_OVERHEAD = 2.0
 PARALLEL_AGENTS = 4
 AGENT_HOURS_PER_DAY = 8.0
 MAINTENANCE_SHARE = 0.15
-ONBOARDING_DAYS = 1.0
-UPGRADE_DAYS = {0: 6.0, 1: 4.0, 2: 3.0, 3: 2.0, 4: 1.0}
-AGENT_OUTPUT_PER_DAY = 60_000      # agent output tokens per day of agent-assisted integration work
+# Minutes to get it running, by the embeddability level (0..4) of its best surface.
+INSTALL_MINUTES = {
+    "cli": [240, 60, 15, 2, 1],        # source only ... published to a registry ... binary/container too
+    "library": [240, 60, 15, 2, 1],
+    "service": [960, 240, 60, 15, 5],  # undocumented setup ... env-configured ... container ... compose/Helm
+}
+INSTALL_MINUTES_OTHER = 60              # frontend-only or nothing detected (embeddability n/a)
+# Minutes to the first successful use, by interface level (0..4); level 0 scales with size.
+FIRST_USE_MINUTES = [2400, 240, 60, 10, 2]
+# Upgrade minutes per year, by contract stability level (n/a: nothing to break).
+UPGRADE_MINUTES = {0: 480, 1: 240, 2: 120, 3: 30, 4: 5, None: 15}
+AGENT_OUTPUT_PER_HOUR = 7_500          # agent output tokens per hour of agent-assisted adoption work
 WORK_DAYS_PER_MONTH = 21.0
 DEFAULT_MODEL = "anthropic:claude-opus-5-5"
 BUY_THRESHOLD, MAKE_THRESHOLD = 1.5, 1 / 1.5
@@ -81,6 +96,26 @@ def _tokens(output: float) -> Dict[str, int]:
     return {"output": out, "input": inp, "cached_input": int(inp * CACHED_SHARE)}
 
 
+def measured_adoption(agentic: Optional[Dict]) -> Optional[Dict]:
+    """Adoption as the agentic probe measured it: the docs-scope 'run' (get it running) and
+    'list' (first use) tasks of the first probe run, when both were attempted."""
+    if not agentic or not agentic.get("runs"):
+        return None
+    tasks = {t["task"]: t for t in agentic["runs"][0]["tasks"] if t["scope"] == "docs" and t["task"] in ("run", "list")}
+    if set(tasks) != {"run", "list"}:
+        return None
+    return {
+        "model": agentic["runs"][0]["model"],
+        "succeeded": all(t["success"] for t in tasks.values()),
+        "outcomes": {k: t["outcome"] for k, t in tasks.items()},
+        "minutes": round(sum(t.get("seconds") or 0 for t in tasks.values()) / 60.0, 2),
+        "tokens": sum(t["input_tokens"] + t["output_tokens"] + t["cache_read_input_tokens"]
+                      + t["cache_creation_input_tokens"] for t in tasks.values()),
+        "cost_usd": None if any(t.get("cost_usd") is None for t in tasks.values())
+        else round(sum(t["cost_usd"] for t in tasks.values()), 4),
+    }
+
+
 def make_or_buy(dims: List[DimensionResult], legibility: Dict, value: Dict, estimate: Dict,
                 buy_price: float = 0.0, horizon: float = 3.0, model: str = DEFAULT_MODEL) -> Dict:
     day_rate = value["assumptions"]["cost_per_pm"] / WORK_DAYS_PER_MONTH
@@ -103,22 +138,29 @@ def make_or_buy(dims: List[DimensionResult], legibility: Dict, value: Dict, esti
     make_yearly = MAINTENANCE_SHARE * make_build
     make_total = make_build + horizon * make_yearly
 
-    # ---- buy -----------------------------------------------------------------
+    # ---- buy: adopt as it is ------------------------------------------------
     size = min(4.0, max(0.5, math.sqrt(max(code, 1) / REFERENCE_TOKENS)))
-    consumer_retrofit = sum(v for k, v in estimate["retrofit_by_dimension"].items() if k != "legibility")
-    integration_days = consumer_retrofit + ONBOARDING_DAYS * size
-    buy_tok = _tokens(integration_days * AGENT_OUTPUT_PER_DAY)
+    by_key = {d.key: d for d in dims}
+    emb, iface, stab = by_key.get("embeddability"), by_key.get("interface"), by_key.get("stability")
+    if emb is not None and emb.level is not None:
+        install = INSTALL_MINUTES.get(emb.best_surface, INSTALL_MINUTES["service"])[emb.level]
+    else:
+        install = INSTALL_MINUTES_OTHER
+    if_level = iface.level if iface is not None and iface.level is not None else 0
+    first_use = FIRST_USE_MINUTES[if_level] * (size if if_level == 0 else 1.0)
+    adoption_minutes = install + first_use
+    upgrade_minutes = UPGRADE_MINUTES[stab.level if stab is not None else None]
+    buy_tok = _tokens(adoption_minutes / 60.0 * AGENT_OUTPUT_PER_HOUR)
     buy_model_cost = _token_cost(price, buy_tok["input"], buy_tok["cached_input"], buy_tok["output"])
-    stab = next((d.level for d in dims if d.key == "stability"), None)
-    upgrade_days = UPGRADE_DAYS[2 if stab is None else stab] * size
-    buy_fixed = integration_days * day_rate + (buy_model_cost or 0.0)
-    buy_yearly = buy_price + upgrade_days * day_rate
+    minute_rate = day_rate / (8 * 60)
+    buy_fixed = adoption_minutes * minute_rate + (buy_model_cost or 0.0)
+    buy_yearly = buy_price + upgrade_minutes * minute_rate
     buy_total = buy_fixed + horizon * buy_yearly
 
     ratio = make_total / buy_total if buy_total else float("inf")
     verdict = "buy" if ratio >= BUY_THRESHOLD else ("make" if ratio <= MAKE_THRESHOLD else "toss-up")
     # Price per year at which both options cost the same over the horizon.
-    break_even = (make_total - buy_fixed - horizon * upgrade_days * day_rate) / horizon if horizon else None
+    break_even = (make_total - buy_fixed - horizon * upgrade_minutes * minute_rate) / horizon if horizon else None
 
     def r(x):
         return None if x is None else round(x, 2)
@@ -143,10 +185,13 @@ def make_or_buy(dims: List[DimensionResult], legibility: Dict, value: Dict, esti
             "total_cost": r(make_total),
         },
         "buy": {
+            "via": {"install": emb.best_surface if emb is not None and emb.level is not None else None,
+                    "use": iface.best_surface if iface is not None else None},
+            "adoption_minutes": {"install": r(install), "first_use": r(first_use), "total": r(adoption_minutes)},
             "tokens": buy_tok,
             "model_cost": r(buy_model_cost),
-            "integration_days": r(integration_days),
-            "upgrade_days_per_year": r(upgrade_days),
+            "upgrade_minutes_per_year": upgrade_minutes,
+            "measured": None,
             "price_per_year": buy_price,
             "fixed_cost": r(buy_fixed),
             "yearly_cost": r(buy_yearly),

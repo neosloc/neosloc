@@ -148,10 +148,32 @@ def _make_buy_lines(m) -> list:
                                  mk["calendar_days"]),
         "                     build %s, then %s/year to maintain -> %s"
         % (_usd(mk["build_cost"]), _usd(mk["yearly_cost"]), _usd(mk["total_cost"])),
-        "  Buy (adopt this):  %.1f integration days, %s/year price, %.1f upgrade days/year -> %s"
-        % (by["integration_days"], _usd(by["price_per_year"]), by["upgrade_days_per_year"], _usd(by["total_cost"])),
-        "  Verdict:           %s (make/buy = %.2f)%s" % (verdict, m["make_buy_ratio"], "; " + be_line if be_line else ""),
-    ]
+        "  Buy (adopt as is): %s to running (via %s) + %s to first use (via %s), %s/year price, "
+        "%s/year of upgrades -> %s"
+        % (_dur(by["adoption_minutes"]["install"]), by["via"]["install"] or "-", _dur(by["adoption_minutes"]["first_use"]),
+           by["via"]["use"] or "-", _usd(by["price_per_year"]), _dur(by["upgrade_minutes_per_year"]), _usd(by["total_cost"])),
+        "  Verdict:           %s (make/buy = %s)%s" % (verdict, _ratio(m["make_buy_ratio"]), "; " + be_line if be_line else ""),
+    ] + ([_measured_line(by["measured"])] if by.get("measured") else [])
+
+
+def _dur(minutes) -> str:
+    if minutes < 1:
+        return "<1 min"
+    if minutes < 90:
+        return "%d min" % round(minutes)
+    if minutes < 8 * 60 * 2:
+        return "%.1f h" % (minutes / 60.0)
+    return "%.1f days" % (minutes / 480.0)
+
+
+def _ratio(r) -> str:
+    return "%.0f" % r if r >= 100 else ("%.1f" % r if r >= 10 else "%.2f" % r)
+
+
+def _measured_line(m) -> str:
+    return "  Measured:          the %s probe %s getting it running and a first call from the docs in %s (%s tokens)" % (
+        m["model"], "succeeded at" if m["succeeded"] else "did not complete (%s)" % ", ".join(
+            "%s: %s" % kv for kv in sorted(m["outcomes"].items())), _dur(m["minutes"]), _k(m["tokens"]))
 
 
 def _agentic_lines(a, static_levels) -> list:

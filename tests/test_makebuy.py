@@ -74,15 +74,39 @@ class Model(Base):
         dims = copy.deepcopy(self.report.dimensions)
         stab = next(d for d in dims if d.key == "stability")
         stab.level = 0
-        unstable = self.mb(dims=dims)["buy"]["upgrade_days_per_year"]
+        unstable = self.mb(dims=dims)["buy"]["upgrade_minutes_per_year"]
         stab.level = 4
-        stable = self.mb(dims=dims)["buy"]["upgrade_days_per_year"]
+        stable = self.mb(dims=dims)["buy"]["upgrade_minutes_per_year"]
         self.assertLess(stable, unstable)
 
-    def test_legibility_is_not_a_buyer_cost(self):
+    def test_retrofit_is_not_a_buyer_cost(self):
         est = copy.deepcopy(self.report.estimate)
-        est["retrofit_by_dimension"]["legibility"] = 100.0
-        self.assertEqual(self.mb(estimate=est)["buy"]["integration_days"], self.mb()["buy"]["integration_days"])
+        est["retrofit_person_days"] = 100.0
+        est["retrofit_by_dimension"] = {k: 50.0 for k in est["retrofit_by_dimension"]}
+        self.assertEqual(self.mb(estimate=est)["buy"], self.mb()["buy"])
+
+    def levels(self, **levels):
+        dims = copy.deepcopy(self.report.dimensions)
+        for d in dims:
+            if d.key in levels:
+                d.level, d.best_surface = levels[d.key]
+        return self.mb(dims=dims)["buy"]["adoption_minutes"]
+
+    def test_published_cli_is_adopted_in_minutes(self):
+        a = self.levels(embeddability=(3, "cli"), interface=(4, "cli"))
+        self.assertLessEqual(a["total"], 5)
+
+    def test_standard_service_with_compose_is_minutes(self):
+        a = self.levels(embeddability=(4, "service"), interface=(4, "service"))
+        self.assertLessEqual(a["total"], 10)
+
+    def test_no_programmatic_surface_takes_days(self):
+        a = self.levels(embeddability=(1, "service"), interface=(0, "frontend"))
+        self.assertGreaterEqual(a["total"], 8 * 60)
+
+    def test_adoption_gets_faster_with_each_level(self):
+        totals = [self.levels(embeddability=(lvl, "service"), interface=(lvl, "service"))["total"] for lvl in range(5)]
+        self.assertEqual(totals, sorted(totals, reverse=True))
 
     def test_unknown_model_keeps_tokens_without_price(self):
         m = self.mb(model="anthropic:claude-unknown-9")
@@ -94,6 +118,23 @@ class Model(Base):
         a, b = self.mb(model="anthropic:claude-opus-5-5"), self.mb(model="anthropic:claude-haiku-4-5")
         self.assertLess(b["make"]["model_cost"], a["make"]["model_cost"])
         self.assertEqual(a["make"]["tokens"], b["make"]["tokens"])
+
+
+class Measured(Base):
+    def test_probe_measurement_is_attached(self):
+        from neosloc.makebuy import measured_adoption
+        def task(name, ok, secs):
+            return {"task": name, "scope": "docs", "success": ok, "outcome": "solved" if ok else "ungrounded",
+                    "seconds": secs, "input_tokens": 1000, "output_tokens": 100, "cache_read_input_tokens": 0,
+                    "cache_creation_input_tokens": 0, "cost_usd": 0.01}
+        agentic = {"runs": [{"model": "m", "tasks": [task("run", True, 60), task("list", True, 30),
+                                                      task("auth", False, 10)]}]}
+        m = measured_adoption(agentic)
+        self.assertEqual((m["succeeded"], m["minutes"], m["tokens"], m["cost_usd"]), (True, 1.5, 2200, 0.02))
+        agentic["runs"][0]["tasks"][1] = task("list", False, 30)
+        self.assertFalse(measured_adoption(agentic)["succeeded"])
+        self.assertIsNone(measured_adoption({"runs": [{"model": "m", "tasks": [task("auth", True, 5)]}]}))
+        self.assertIsNone(measured_adoption(None))
 
 
 class Cli(Base):
