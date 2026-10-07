@@ -17,6 +17,7 @@ docs are built, so they always match the code.
     | `cli` | A declared entry point (console script, npm `bin`, Go `main`, Cargo binary) and argument parsing. |
     | `library` | A distributable package with an importable API (a Python package, an npm package with `main`/`exports` that isn't a web app, a Go module with non-`main` packages, a Rust lib crate). A service counts as a library only if it is published. |
     | `desktop` | A desktop GUI toolkit: Electron, Tauri, Qt, GTK, Tkinter, wxWidgets, WPF/WinForms/MAUI, Avalonia, JavaFX/Swing, Compose Desktop, Rust GUI crates (egui, iced, slint), Fyne/Wails, Flutter desktop, or a macOS SwiftUI/AppKit app (SwiftUI alone may be iOS, so a macOS indicator is required). |
+    | `format` | A file or wire format: a specification document that describes bytes, headers, offsets and encodings (not just any `spec.md`), or a machine-readable definition (Kaitai Struct, ABNF/EBNF). Its reference implementations are detected as libraries, up to two directories deep (`js/`, `python/<pkg>/`, `crates/<name>/`). |
     | `frontend` | An `index.html` with a `package.json`, and no service or desktop app (an Electron/Tauri `index.html` is the desktop app's UI). |
 
     Three more properties decide whether some dimensions apply: a **long-running mode**
@@ -77,7 +78,9 @@ opt out with a `neosloc: ignore` comment in its first five lines.
 
 <!-- neosloc:ladder interface -->
 
-Never `n/a`. A frontend alone, or no surface at all, is level 0.
+Never `n/a`. A frontend alone, or no surface at all, is level 0. For a file format the
+specification is the interface, and a format is only as usable as its implementations,
+so level 3 asks for reference implementations in two languages.
 
 A standard application protocol is a contract in its own right: any off-the-shelf client
 can use the server. What it leaves open is the application layer on top (which commands,
@@ -111,7 +114,8 @@ long-running mode. Receiving other platforms' webhooks never counts as publishin
 
 <!-- neosloc:ladder portability -->
 
-**n/a** for projects that own no persistent data. A tool's *output* format belongs to
+**n/a** for projects that own no persistent data, and for file formats: a format is itself
+the portability layer. A tool's *output* format belongs to
 Interface (cli level 4).
 
 ## 6. Agent ergonomics

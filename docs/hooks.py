@@ -21,7 +21,7 @@ def _ladder(key):
     from neosloc.assess import SPECS
     from neosloc.ladder import UNIVERSAL
     spec = next(sp for sp in SPECS if sp.key == key)
-    surfaces = [k for k in ("service", "cli", "library", "desktop", "frontend", UNIVERSAL) if k in spec.ladders]
+    surfaces = [k for k in ("service", "cli", "library", "desktop", "format", "frontend", UNIVERSAL) if k in spec.ladders]
     out = ["*%s*" % spec.question, ""]
     if surfaces == [UNIVERSAL]:
         out += ["| Level | Requirement |", "|---|---|"]

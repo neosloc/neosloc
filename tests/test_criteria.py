@@ -620,6 +620,64 @@ class ExampleDepth(Fixture):
                          ["src/main/java/org/acme/samples/petclinic/App.java"])
 
 
+class FileFormat(Fixture):
+    """A file-format project (PMTiles-like): the specification is the interface."""
+
+    SPEC = textwrap.dedent("""\
+        # Tiles format v3
+
+        The file starts with a 127-byte header. All integers are little-endian uint64.
+        The magic number is `TL`. Byte 7 is the version. Tile compression: 0x01 none, 0x02 gzip.
+        Metadata is a JSON object of key-value pairs. Values 0x05-0xff are reserved.
+        Readers must ignore unknown metadata keys. Version 2 is deprecated; readers should support it.
+        """)
+
+    def setUp(self):
+        super().setUp()
+        self.write("spec/v3/spec.md", self.SPEC)
+        self.write("spec/v2/spec.md", self.SPEC.replace("v3", "v2"))
+        self.write("spec/v3/CHANGELOG.md", "## v3\n- new header\n")
+        self.write("spec/v3/sample.tl", "x")
+        self.write("js/test/data/invalid.tl", "x")
+        self.write("js/package.json", '{"name": "tiles", "main": "dist/index.js", "types": "dist/index.d.ts"}')
+        self.write("js/src/index.ts", "export const read = (b: Uint8Array): number => b[0];\n")
+        self.write("python/tiles/setup.py", "from setuptools import setup\nsetup(name='tiles')\n")
+        self.write("python/tiles/tiles/__init__.py", "def read(b):\n    return b[0]\n")
+
+    def test_surfaces_include_format_and_nested_libraries(self):
+        self.assertEqual(self.results()[1].kinds, ["library", "format"])
+        self.assertEqual(Facts(Repo(self.dir)).library_ecosystems(), ["JavaScript", "Python"])
+
+    def test_format_ladders(self):
+        self.assertEqual(self.surface_level("interface", "format"), 4)
+        self.assertEqual(self.surface_level("stability", "format"), 3)  # no migration tooling
+        self.assertEqual(self.surface_level("extensibility", "format"), 3)  # no extension process
+
+    def test_portability_is_na_for_formats(self):
+        self.write("python/tiles/tiles/convert.py", "import sqlite3\ndb = sqlite3.connect('in.mbtiles')\n")
+        d = self.dim("portability")
+        self.assertIsNone(d.level)
+        self.assertIn("portability layer", d.rationale)
+
+    def test_any_spec_md_is_not_a_format(self):
+        shutil.rmtree(os.path.join(self.dir, "spec"))
+        self.write("docs/spec.md", "# Product spec\n\nUsers can log in and see a dashboard.\n")
+        self.assertNotIn("format", self.results()[1].kinds)
+
+    def test_config_json_schema_is_not_a_format(self):
+        shutil.rmtree(os.path.join(self.dir, "spec"))
+        self.write("app/specs/schemas/pipeline-spec.schema.json", '{"$schema": "http://json-schema.org/draft-07/schema#"}')
+        self.assertNotIn("format", self.results()[1].kinds)
+
+    def test_tauri_app_crate_is_not_a_library(self):
+        self.write("src-tauri/src/lib.rs", "pub fn run() {}\n")
+        self.assertNotIn("Rust library crate", [h.detail for h in Facts(Repo(self.dir)).library()])
+
+    def test_rspec_tests_are_still_tests(self):
+        self.write("spec/models/user_spec.rb", "describe User do\nend\n")
+        self.assertTrue(Repo(self.dir).is_test("spec/models/user_spec.rb"))
+
+
 class FalseNegatives(Fixture):
     """Found by evaluating sindresorhus/ky through the archive's issue workflow."""
 

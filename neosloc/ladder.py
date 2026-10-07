@@ -11,7 +11,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from .facts import Facts, Hits
 
-SURFACES = ("service", "cli", "library", "desktop", "frontend")
+SURFACES = ("service", "cli", "library", "desktop", "format", "frontend")
 UNIVERSAL = "all"
 
 # A check returns evidence when the requirement is met. An empty list, or a
@@ -72,6 +72,8 @@ def detect_surfaces(f: Facts) -> Surfaces:
         evidence["library"] = f.library()
     if f.desktop():
         evidence["desktop"] = f.desktop()
+    if f.format_spec():
+        evidence["format"] = f.format_spec()[:2]
     if f.frontend() and "service" not in evidence and "desktop" not in evidence:
         evidence["frontend"] = f.frontend()  # an Electron/Tauri index.html is the desktop app's UI
     kinds = [k for k in SURFACES if k in evidence]

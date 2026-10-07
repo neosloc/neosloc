@@ -10,7 +10,8 @@ from __future__ import annotations
 import re
 from typing import List, Tuple
 
-from .facts import (AUTOMATION_CONTRACT, CRASH_REPORTING, DESKTOP_ARGS, DESKTOP_VERBOSITY, HEADLESS, INSTALLER,
+from .facts import (FORMAT_MIGRATION, SPEC_COMPATIBILITY, SPEC_ENUMS, SPEC_EXTENSION_PROCESS, SPEC_METADATA,
+                    SPEC_UNKNOWN, AUTOMATION_CONTRACT, CRASH_REPORTING, DESKTOP_ARGS, DESKTOP_VERBOSITY, HEADLESS, INSTALLER,
                     INSTALLER_CODE, MANAGED_CONFIG, PACKAGE_MANAGER, AGENT_DOCS, BREAKING_MARK, COMPOSITION, CONDITIONAL, DEPRECATION, DOCKERFILE, DOCTEST,
                     DRY_RUN, ENV_READ, ENV_TEMPLATE, EVENT_HOOK_CLI, EVENT_STREAM_CLI, EXCEPTION_CLASS, EXPORT,
                     EXPORT_DOC, EXTRAS, EXT_API_VERSION, FILE_TOKEN_BUDGET, HEALTH, HEALTHCHECK_CFG, HOOKS, IDEMPOTENCY,
@@ -94,6 +95,20 @@ def gated_by_headless(check):
     def run(f: Facts):
         return check(f) if headless(f) else "no headless mode for automated callers"
     return run
+
+
+def spec_says(rx, what: str):
+    def check(f: Facts):
+        hits = [h for h in f.format_spec() if rx.search(f.repo.read(h.path))]
+        return ok([Hit(h.path, what) for h in hits[:1]], "the specification doesn't say: " + what)
+    return check
+
+
+def _reference_implementations(f: Facts):
+    eco = f.library_ecosystems()
+    if len(eco) >= 2:
+        return [Hit(h.path, h.detail) for h in f.library()[:3]]
+    return "reference implementations in %d language(s)%s" % (len(eco), (" (" + eco[0] + ")") if eco else "")
 
 
 # Reused checks
@@ -212,6 +227,19 @@ register(DimensionSpec(
                         lambda f: ok(f.paths(AUTOMATION_CONTRACT) + f.grep(re.compile(r"\bAppIntent\b")) + f.api_specs()
                                      + f.mcp_server(), "no machine-readable automation contract")),
         ],
+        "format": [
+            Requirement(1, "specification", "A specification document describes the format (layout, header, "
+                        "encoding), or a machine-readable definition exists.",
+                        lambda f: ok(f.format_spec(), "no format specification")),
+            Requirement(2, "versioned-spec", "The specification is versioned (versioned spec documents, or a "
+                        "version field in the format).", lambda f: ok(f.spec_versions(), "the specification isn't versioned")),
+            Requirement(3, "reference-implementations", "Reference implementations exist in at least two languages.",
+                        _reference_implementations),
+            Requirement(4, "conformance", "Conformance material: sample files including invalid ones, or a "
+                        "machine-readable definition (Kaitai Struct, ABNF, JSON Schema).",
+                        lambda f: ok(f.format_fixtures() + [h for h in f.format_spec() if "machine-readable" in h.detail],
+                                     "no sample/invalid fixtures or machine-readable definition")),
+        ],
         "frontend": [
             Requirement(1, "programmatic", "A programmatic surface besides the UI.",
                         lambda f: "a UI is not a programmatic surface"),
@@ -222,7 +250,7 @@ register(DimensionSpec(
         ],
     },
     # Never n/a: having no programmatic surface is the lowest interface level, not an exemption.
-    lambda s: ([k for k in ("service", "cli", "library", "desktop", "frontend") if s.has(k)] or ["none"], ""),
+    lambda s: ([k for k in ("service", "cli", "library", "desktop", "format", "frontend") if s.has(k)] or ["none"], ""),
 ))
 
 
@@ -257,10 +285,32 @@ def _clean_history(f: Facts):
     return ev
 
 
+FORMAT_STABILITY = [
+    Requirement(1, "format-version", "The format carries a version.", lambda f: ok(f.spec_versions(), "no format version")),
+    Requirement(2, "spec-changes", "Changes between format versions are documented (a spec changelog or "
+                "per-version specifications).",
+                lambda f: ok(f.spec_changelog() + ([Hit(None, "per-version specifications")]
+                                                 if len(f.format_spec()) >= 2 and f.spec_versions() else []),
+                             "changes between versions aren't documented")),
+    Requirement(3, "compatibility-rules", "The specification states compatibility rules (what readers and "
+                "writers must do across versions, deprecations).",
+                spec_says(SPEC_COMPATIBILITY, "compatibility rules")),
+    Requirement(4, "migration", "Old versions can be migrated or converted (documented tooling).",
+                lambda f: ok(f.docs(FORMAT_MIGRATION)[:1] + f.grep(FORMAT_MIGRATION)[:1], "no migration from old versions")),
+]
+
+
+def _stability_applicable(s: Surfaces) -> Tuple[List[str], str]:
+    out = [UNIVERSAL] if any(s.has(k) for k in ("service", "cli", "library", "desktop")) else []
+    if s.has("format"):
+        out.append("format")
+    return out, "no service, cli, library, desktop or format surface"
+
+
 register(DimensionSpec(
     "stability", "Contract stability",
     "Can integrators rely on it not changing under them?",
-    {UNIVERSAL: [
+    {"format": FORMAT_STABILITY, UNIVERSAL: [
         Requirement(1, "versioned-releases", "Releases are versioned (semver tags or versioned changelog sections).",
                     _versioned),
         Requirement(2, "changelog", "A changelog exists and marks breaking changes.", _changelog_marks),
@@ -271,7 +321,7 @@ register(DimensionSpec(
         Requirement(4, "clean-history", "Across tagged releases, no OpenAPI operation, CLI option or __all__ "
                     "symbol was removed without first being deprecated.", _clean_history),
     ]},
-    universal_if("service", "cli", "library", "desktop"),
+    _stability_applicable,
 ))
 
 
@@ -403,6 +453,8 @@ register(DimensionSpec(
 
 
 def _owns_data(s: Surfaces) -> Tuple[List[str], str]:
+    if s.has("format") and not s.has("service"):
+        return [], "a file format is itself the portability layer (its conversions count under Interface)"
     return ([UNIVERSAL] if s.owns_data else []), "owns no persistent data"
 
 
@@ -593,7 +645,16 @@ def _documented_extension_api(f: Facts):
 register(DimensionSpec(
     "extensibility", "Extensibility",
     "Can behaviour be added without modifying the code?",
-    {UNIVERSAL: [
+    {"format": [
+        Requirement(1, "metadata", "The specification defines free-form metadata or custom fields.",
+                    spec_says(SPEC_METADATA, "metadata or custom fields")),
+        Requirement(2, "unknown-fields", "Readers are told how to treat unknown fields or values (forward "
+                    "compatibility), or values are reserved.", spec_says(SPEC_UNKNOWN, "unknown or reserved fields")),
+        Requirement(3, "registered-values", "Enumerations (types, compressions) are extensible, with reserved or "
+                    "registered values.", spec_says(SPEC_ENUMS, "extensible enumerations")),
+        Requirement(4, "extension-process", "A documented process or registry for adding extensions.",
+                    spec_says(SPEC_EXTENSION_PROCESS, "an extension process")),
+    ], UNIVERSAL: [
         Requirement(1, "seams", "Internal seams: a registry, registration function or plugin manager.",
                     lambda f: ok(f.grep(SEAM), "no registry or registration function")),
         Requirement(2, "documented", "The docs show how to add behaviour through those seams (even in-tree).",
@@ -607,7 +668,7 @@ register(DimensionSpec(
                                      ok(f.grep(HOOKS), "no lifecycle hooks"),
                                      ok(f.paths(r"(^|/)(examples?|contrib)/[\w-]*(plugin|extension)"), "no example extensions"))),
     ]},
-    lambda s: ([UNIVERSAL], ""),
+    lambda s: ([UNIVERSAL] + (["format"] if s.has("format") else []), ""),
 ))
 
 

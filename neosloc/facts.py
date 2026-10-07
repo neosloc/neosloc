@@ -13,7 +13,7 @@ from __future__ import annotations
 import ast
 import posixpath
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -245,6 +245,23 @@ CRASH_REPORTING = re.compile(r"sentry|crashpad|breakpad|crashlytics|bugsnag|Metr
 DESKTOP_VERBOSITY = re.compile(r"""['"]--(verbose|debug|log[-_]level)['"]|\blog[_-]?[lL]evel\b|LogLevel\b""")
 CREDENTIAL_STORE = re.compile(r"\bKeychain\b|SecItemAdd|kSecClass|\bkeytar\b|safeStorage|libsecret|SecretService|"
                               r"CredentialManager|PasswordVault|\bkeyring\b|tauri-plugin-stronghold|keyring-rs")
+
+# File formats
+SPEC_DOC = re.compile(r"(^|/)(spec|specs|specification|format|formats)/[\w./() -]*\.(md|rst|txt|adoc)$"
+                      r"|(^|/)(SPEC|SPECIFICATION|FORMAT|spec|specification|format)[\w.-]*\.(md|rst|txt|adoc)$")
+FORMAT_TERMS = re.compile(r"\b(bytes?|header|magic number|magic|offset|little[- ]endian|big[- ]endian|varint|"
+                          r"uint(?:8|16|32|64)|byte order|file format|wire format|encoding|compression)\b", re.I)
+# Byte/grammar definitions only: a JSON Schema describes configuration or data, not a format.
+FORMAT_DEFINITION = re.compile(r"\.ksy$|(^|/)[\w.-]+\.(abnf|ebnf)$")
+SPEC_VERSION_DIR = re.compile(r"(^|/)(spec|specs|specification|format)/v?\d+(\.\d+)*(?=/)")
+SPEC_COMPATIBILITY = re.compile(r"backwards?[- ]compatib|forwards?[- ]compatib|readers? (must|should|may)|"
+                                r"must (be )?ignore[d]?|deprecated|breaking change", re.I)
+SPEC_METADATA = re.compile(r"\bmetadata\b|custom (fields?|keys?)|user[- ]defined|key[- ]value", re.I)
+SPEC_UNKNOWN = re.compile(r"(ignore|skip)s? (any )?unknown|unknown (fields?|keys?|values?|extensions?)|reserved", re.I)
+SPEC_ENUMS = re.compile(r"\b0x[0-9a-f]{2}\b.{0,40}\b(type|compression|kind)|\b(type|compression|kind)\b\W.{0,40}\b0x[0-9a-f]{2}\b|\b(type|compression)\b.{0,60}\breserved|"
+                        r"registered values?|\bregistry\b", re.I | re.S)
+SPEC_EXTENSION_PROCESS = re.compile(r"(propos|submit|register)\w* (an? )?(new )?(extension|value|type)|extension (process|registry)", re.I)
+FORMAT_MIGRATION = re.compile(r"\b(convert|upgrade|migrate)\w*\b.{0,60}\b(v\d|version)", re.I)
 
 # Legibility
 CI = r"(^|/)(\.github/workflows/[^/]+\.ya?ml|\.gitlab-ci\.yml|\.circleci/config\.yml|Jenkinsfile|\.travis\.yml|azure-pipelines\.yml|\.woodpecker\.ya?ml|bitbucket-pipelines\.yml)$"
@@ -493,39 +510,110 @@ class Facts:
 
     # ---- library ------------------------------------------------------------
 
+    def _product_manifest(self, rx: str) -> List[str]:
+        """Manifests matching rx up to two directories deep, outside tests/examples/vendored code
+        (reference implementations often live in js/, python/<pkg>/, crates/<name>/)."""
+        r = re.compile(r"^([^/]+/){0,2}" + rx + r"$")
+        return [f for f in self.repo.files if r.search(f) and not self.repo.is_test(f) and not self.repo.is_example(f)]
+
+    def _python_manifest_dirs(self) -> List[str]:
+        return sorted({posixpath.dirname(m) for m in self._product_manifest(r"(pyproject\.toml|setup\.py|setup\.cfg)")})
+
     def library(self) -> Hits:
         def compute():
             out = []
             publish = bool(self.workflows(PUBLISH))
             service = bool(self.route_total() or self.server())
-            for pj in self.repo.glob(r"^(packages/[^/]+/)?package\.json$"):
+            for pj in self._product_manifest(r"package\.json"):
                 t = self.repo.read(pj)
+                base = posixpath.dirname(pj)
                 explicit = re.search(r'"(module|exports|types|typings|files)"\s*:', t)
-                is_app = bool(self.repo.glob(r"^(public/|src/|app/)?index\.html$"))
+                is_app = bool(self.repo.glob(r"^%s(public/|src/|app/)?index\.html$" % (re.escape(base) + "/" if base else "")))
                 private = re.search(r'"private"\s*:\s*true', t)
                 if (explicit or (re.search(r'"main"\s*:', t) and not is_app)) and not private:
                     out.append(Hit(pj, "npm package"))
-            py_manifest = self.repo.glob(r"^(pyproject\.toml|setup\.py|setup\.cfg)$")
-            if py_manifest and (not service or publish):
-                pkgs = sorted({f.split("/")[0] for f in self.code if f.endswith("/__init__.py") and f.count("/") == 1}
-                              | {f.split("/")[1] for f in self.code if f.startswith("src/") and f.endswith("/__init__.py")
-                                 and f.count("/") == 2})
-                if pkgs and re.search(r"\[project\]|setup\(|\[tool\.poetry\]|\[metadata\]",
-                                      "".join(self.repo.read(m) for m in py_manifest)):
-                    out.append(Hit(py_manifest[0], "Python package " + ", ".join(pkgs)))
-            gomod = self.repo.glob(r"^go\.mod$")
-            if gomod and any(f.endswith(".go") and not re.search(r"^package main\b", self.repo.read(f), re.M)
-                             for f in self.code if not re.search(r"(^|/)(cmd|internal)/", f)):
-                out.append(Hit(gomod[0], "Go module with exported packages"))
-            out += [Hit(f, "Rust library crate") for f in self.repo.glob(r"^(crates/[^/]+/)?src/lib\.rs$")]
-            out += [Hit(f, "Swift package library") for f in self.repo.glob(r"^Package\.swift$")
+            if not service or publish:
+                for d in self._python_manifest_dirs():
+                    pkgs = self._python_packages_in(d)
+                    texts = "".join(self.repo.read(posixpath.join(d, m)) for m in ("pyproject.toml", "setup.py", "setup.cfg"))
+                    if pkgs and re.search(r"\[project\]|setup\(|\[tool\.poetry\]|\[metadata\]", texts):
+                        manifest = next(posixpath.join(d, m) for m in ("pyproject.toml", "setup.py", "setup.cfg")
+                                        if self.repo.exists(posixpath.join(d, m)))
+                        out.append(Hit(manifest, "Python package " + ", ".join(posixpath.basename(p) for p in pkgs)))
+            for gomod in self._product_manifest(r"go\.mod"):
+                base = posixpath.dirname(gomod)
+                if any(f.endswith(".go") and f.startswith(base) and not re.search(r"^package main\b", self.repo.read(f), re.M)
+                       for f in self.code if not re.search(r"(^|/)(cmd|internal)/", f)):
+                    out.append(Hit(gomod, "Go module with exported packages"))
+            # src-tauri/src/lib.rs is a Tauri app's own crate, not a library.
+            out += [Hit(f, "Rust library crate") for f in self._product_manifest(r"src/lib\.rs")
+                    if not f.startswith("src-tauri/")]
+            out += [Hit(f, "Swift package library") for f in self._product_manifest(r"Package\.swift")
                     if re.search(r"\.library\(", self.repo.read(f))]
             return out
         return self._cached("library", compute)
 
+    def _python_packages_in(self, d: str) -> List[str]:
+        prefix = d + "/" if d else ""
+        out = set()
+        for f in self.code:
+            if not f.endswith("/__init__.py") or not f.startswith(prefix):
+                continue
+            rest = f[len(prefix):].split("/")
+            if len(rest) == 2 or (len(rest) == 3 and rest[0] == "src"):
+                out.add(posixpath.dirname(f))
+        return sorted(out)
+
     def python_packages(self) -> List[str]:
-        return sorted({f.rsplit("/", 1)[0] for f in self.code if f.endswith("__init__.py")
-                       and (f.count("/") == 1 or (f.startswith("src/") and f.count("/") == 2))})
+        return sorted({p for d in self._python_manifest_dirs() for p in self._python_packages_in(d)})
+
+    def library_ecosystems(self) -> List[str]:
+        kinds = {"npm package": "JavaScript", "Go module with exported packages": "Go", "Rust library crate": "Rust",
+                 "Swift package library": "Swift"}
+        return sorted({kinds.get(h.detail, "Python" if h.detail.startswith("Python") else h.detail) for h in self.library()})
+
+    # ---- file formats -------------------------------------------------------
+
+    def _spec_docs(self) -> List[str]:
+        # A top-level spec/ is tests in Ruby (RSpec), but prose under it is documentation.
+        return [f for f in self.repo.files if SPEC_DOC.search(f)
+                and (not self.repo.is_test(f) or (f.startswith("spec/") and not self.repo.language(f)))
+                and not CHANGELOG.search(posixpath.basename(f))]
+
+    def format_spec(self) -> Hits:
+        """Specification documents that describe a byte/wire format (not just any spec.md)."""
+        out = []
+        for f in self._spec_docs():
+            terms = {m.lower() for m in FORMAT_TERMS.findall(self.repo.read(f))}
+            if len(terms) >= 3:
+                out.append(Hit(f, "format specification (%s)" % ", ".join(sorted(terms)[:4])))
+        return out + [Hit(f, "machine-readable format definition") for f in self.repo.files
+                      if FORMAT_DEFINITION.search(f) and not self.repo.is_test(f)]
+
+    def spec_text(self) -> str:
+        return "\n".join(self.repo.read(h.path) for h in self.format_spec())
+
+    def spec_versions(self) -> Hits:
+        dirs = sorted({m.group(0) for f in self.repo.files for m in [SPEC_VERSION_DIR.search(f)] if m})
+        if dirs:
+            return [Hit(None, "versioned specifications: " + ", ".join(dirs[:4]))]
+        text = self.spec_text()
+        return [Hit(None, "the format declares a version")] if re.search(r"\bversion\b", text, re.I) else []
+
+    def spec_changelog(self) -> Hits:
+        return [Hit(f) for f in self.repo.files if CHANGELOG.search(posixpath.basename(f))
+                and SPEC_DOC.search(posixpath.dirname(f) + "/x.md")]
+
+    def format_fixtures(self) -> Hits:
+        """Sample files of the format and deliberately invalid ones (conformance material)."""
+        exts = Counter(posixpath.splitext(f)[1].lower() for f in self.repo.files
+                       if posixpath.splitext(f)[1] and SPEC_DOC.search(posixpath.dirname(f) + "/x.md")
+                       and not self.repo.language(f) and not f.endswith((".md", ".txt", ".rst", ".adoc", ".png", ".svg", ".jpg")))
+        samples = [f for f in self.repo.files if exts and posixpath.splitext(f)[1].lower() in exts]
+        invalid = [f for f in samples if re.search(r"invalid|corrupt|bad|broken|malformed", posixpath.basename(f), re.I)]
+        if samples and invalid:
+            return [Hit(samples[0], "%d sample files" % len(samples)), Hit(invalid[0], "invalid-input fixture")]
+        return []
 
     def public_api_delimited(self) -> Hits:
         out = []

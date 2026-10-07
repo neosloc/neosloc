@@ -3,6 +3,24 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## 0.8.0
+
+- **File formats are a surface** (`format`): a specification describing a byte or wire
+  format, or a Kaitai Struct/ABNF/EBNF definition. Its ladders:
+  - interface: specification, versioned, reference implementations in two languages,
+    conformance material (sample and invalid files, or a machine-readable definition);
+  - stability: format version, documented changes, compatibility rules, migration;
+  - extensibility: metadata fields, unknown-field rules, extensible enumerations, an
+    extension process.
+  Data portability is n/a for formats (a format is itself the portability layer).
+- **Libraries are found up to two directories deep** (`js/package.json`,
+  `python/<pkg>/setup.py`, `crates/<name>/src/lib.rs`), so multi-language repositories and
+  client libraries (`clients/<x>/`) are seen. A Tauri app's `src-tauri` crate isn't one.
+- Prose under a top-level `spec/` is documentation, while `.rb` files there are still
+  RSpec tests.
+- Example: protomaps/PMTiles goes from no surface (interface 0, portability judged by
+  database migrations) to library + format: interface 4, stability 3, portability n/a.
+
 ## 0.7.4
 
 - **Fix:** a lower-case `readme.md` (common on npm) counts as a README.
