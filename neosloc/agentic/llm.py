@@ -195,7 +195,7 @@ class AnthropicBackend:
 # OpenRouter
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
-APP_HEADERS = {"HTTP-Referer": "https://github.com/sirmmo/neosloc", "X-Title": "neosloc"}
+APP_HEADERS = {"HTTP-Referer": "https://github.com/neosloc/neosloc", "X-Title": "neosloc"}
 _MODEL_CACHE: Dict[str, Dict] = {}
 
 

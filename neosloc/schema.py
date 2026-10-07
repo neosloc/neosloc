@@ -11,7 +11,7 @@ import json
 from typing import Any, Dict
 
 SCHEMA_VERSION = 2
-SCHEMA_ID = "https://ingmmo.com/neosloc/schema/report-v%d.json" % SCHEMA_VERSION
+SCHEMA_ID = "https://neosloc.github.io/neosloc/schema/report-v%d.json" % SCHEMA_VERSION
 
 LEVEL = {"type": "integer", "minimum": 0, "maximum": 4}
 NUM = {"type": "number"}

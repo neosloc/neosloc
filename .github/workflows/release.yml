@@ -3,7 +3,7 @@ name: release
 # Push a tag like v0.3.0 (matching neosloc/__init__.py) to build, publish to
 # PyPI and create a GitHub release. PyPI publishing uses trusted publishing:
 # configure it once at https://pypi.org/manage/account/publishing/ with
-# owner sirmmo, repository neosloc, workflow release.yml, environment pypi.
+# owner neosloc, repository neosloc, workflow release.yml, environment pypi.
 
 on:
   push:

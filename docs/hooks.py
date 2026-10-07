@@ -87,3 +87,14 @@ def on_page_markdown(markdown, **kwargs):
             return _errors()
         raise ValueError("unknown neosloc marker %r" % kind)
     return MARK.sub(render, markdown)
+
+
+def on_post_build(config, **kwargs):
+    """Publish the JSON Schema at its $id, so validators can fetch it by URL."""
+    if ROOT not in sys.path:
+        sys.path.insert(0, ROOT)
+    from neosloc.schema import SCHEMA_ID, dumps
+    out = os.path.join(config["site_dir"], "schema", SCHEMA_ID.rsplit("/", 1)[-1])
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w") as fh:
+        fh.write(dumps())

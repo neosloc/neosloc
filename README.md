@@ -1,8 +1,8 @@
 # neosloc
 
-[![ci](https://github.com/sirmmo/neosloc/actions/workflows/ci.yml/badge.svg)](https://github.com/sirmmo/neosloc/actions/workflows/ci.yml)
+[![ci](https://github.com/neosloc/neosloc/actions/workflows/ci.yml/badge.svg)](https://github.com/neosloc/neosloc/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/neosloc)](https://pypi.org/project/neosloc/)
-[![docs](https://img.shields.io/badge/docs-ingmmo.com%2Fneosloc-blue)](https://ingmmo.com/neosloc/)
+[![docs](https://img.shields.io/badge/docs-neosloc.github.io%2Fneosloc-blue)](https://neosloc.github.io/neosloc/)
 
 `sloccount` counted lines of code and fed them to COCOMO to estimate the effort to *build*
 software. With LLMs writing code, lines are cheap and that estimate has lost its meaning.
@@ -47,7 +47,7 @@ Value (neoCOCOMO, cost approach; see neosloc/value.py)
   Knowledge at risk:             38% of replacement cost lives only in code and history
 ```
 
-**Documentation: <https://ingmmo.com/neosloc/>**
+**Documentation: <https://neosloc.github.io/neosloc/>**
 
 ## Install
 
@@ -55,7 +55,7 @@ Value (neoCOCOMO, cost approach; see neosloc/value.py)
 |---|---|
 | `pip install neosloc` (or `pipx install neosloc`, `uv tool install neosloc`) | the `neosloc` command; the static analysis has **no dependencies** and runs on Python ≥ 3.8 |
 | `pip install 'neosloc[agentic]'` | adds the anthropic SDK, needed for `anthropic:` models (Python ≥ 3.10) |
-| `pip install git+https://github.com/sirmmo/neosloc` | the development version |
+| `pip install git+https://github.com/neosloc/neosloc` | the development version |
 
 OpenRouter models need no extra package, only `OPENROUTER_API_KEY`.
 
@@ -80,9 +80,9 @@ reported as `n/a` and left out of the index.
 | `observability` | Health/readiness, metrics, tracing, structured logs, error tracking. |
 | `legibility` | The heir to SLOC: tokens per module, import cycles, tests, types, CI, lockfiles, agent docs. |
 
-Details, with every requirement: [dimensions](https://ingmmo.com/neosloc/dimensions/),
-[retrofit effort](https://ingmmo.com/neosloc/estimate/),
-[neoCOCOMO](https://ingmmo.com/neosloc/value/).
+Details, with every requirement: [dimensions](https://neosloc.github.io/neosloc/dimensions/),
+[retrofit effort](https://neosloc.github.io/neosloc/estimate/),
+[neoCOCOMO](https://neosloc.github.io/neosloc/value/).
 
 ## LLM evaluators
 
@@ -100,21 +100,21 @@ neosloc --review --review-model openrouter:google/gemini-3.8-flash,openrouter:de
 Models are written `provider:model`. The default is `anthropic:claude-opus-5-5` at effort
 `medium`. A comma-separated list runs a panel and reports agreement. Every model call
 shares one `--max-cost` budget (default $5), and the report states the total. See
-[LLM evaluators](https://ingmmo.com/neosloc/evaluators/) and
-[Using OpenRouter](https://ingmmo.com/neosloc/openrouter/).
+[LLM evaluators](https://neosloc.github.io/neosloc/evaluators/) and
+[Using OpenRouter](https://neosloc.github.io/neosloc/openrouter/).
 
 ## Scripting
 
 `--json` output (reports *and* errors) follows a published JSON Schema (`neosloc
 --schema`). Exit statuses distinguish error classes (2 usage, 3 path, 4 evaluator setup).
 Diagnostics go to stderr: `-q`, `--log-level`, `--log-format json`. See
-[JSON output](https://ingmmo.com/neosloc/json/) and
-[Command line](https://ingmmo.com/neosloc/cli/).
+[JSON output](https://neosloc.github.io/neosloc/json/) and
+[Command line](https://neosloc.github.io/neosloc/cli/).
 
 ## Status
 
 All thresholds and coefficients are uncalibrated, so treat the numbers as rankings.
-[Calibration and limits](https://ingmmo.com/neosloc/calibration/) describes how to fix
+[Calibration and limits](https://neosloc.github.io/neosloc/calibration/) describes how to fix
 that; `--review` and `--agentic` exist partly to do it.
 
 ## Development
@@ -124,7 +124,7 @@ python -m unittest discover -s tests -t .     # no network, no API spend
 python -m neosloc .
 ```
 
-See [Writing criteria](https://ingmmo.com/neosloc/extending/) and `AGENTS.md`.
+See [Writing criteria](https://neosloc.github.io/neosloc/extending/) and `AGENTS.md`.
 Releases: bump `neosloc/__init__.py`, add a `CHANGELOG.md` section, push a `vX.Y.Z` tag.
 
 MIT licensed.

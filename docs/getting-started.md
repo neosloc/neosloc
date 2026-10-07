@@ -19,7 +19,7 @@
 === "From GitHub"
 
     ```bash
-    pip install git+https://github.com/sirmmo/neosloc
+    pip install git+https://github.com/neosloc/neosloc
     ```
 
 This installs the `neosloc` command. `python -m neosloc` also works.

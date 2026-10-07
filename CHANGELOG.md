@@ -3,6 +3,13 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## Unreleased
+
+- The project moved to the **neosloc** organization: https://github.com/neosloc/neosloc
+  (old `sirmmo/neosloc` URLs redirect). Docs: https://neosloc.github.io/neosloc/
+- The JSON Schema is published at its `$id`:
+  https://neosloc.github.io/neosloc/schema/report-v2.json
+
 ## 0.7.0
 
 - **Make or buy.** Every report now costs rebuilding an equivalent with agents (tokens,
