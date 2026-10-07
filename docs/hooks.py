@@ -6,7 +6,6 @@
     <!-- neosloc:schema -->           `neosloc --schema`
     <!-- neosloc:errors -->           error codes and exit statuses
 """
-import importlib
 import io
 import os
 import re
