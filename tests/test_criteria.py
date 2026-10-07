@@ -327,6 +327,17 @@ class ProtocolServers(Fixture):
         self.write("Cargo.toml", "[package]\nname = \"srv\"\n")
         self.assertEqual(self.surface_level("interface", "service"), 1)
 
+    def test_native_protocol_errors(self):
+        self.server(["redis-protocol"])
+        self.write("src/resp.rs", "fn bad() -> Resp2Frame {\n    Resp2Frame::Error(\"ERR malformed\".into())\n}\n")
+        self.assertEqual(self.surface_level("ergonomics", "service"), 1)
+
+    def test_protocol_errors_need_a_protocol_server(self):
+        self.write("src/main.rs", "use axum::Router;\nfn r() { Router::new().route(\"/x\", get(h)); }\n"
+                   "fn bad() { Resp2Frame::Error(e) }\n")
+        self.write("Cargo.toml", "[package]\nname = \"srv\"\n")
+        self.assertEqual(self.surface_level("ergonomics", "service"), 0)
+
     def test_benchmarks_are_not_product_code(self):
         self.write("bench/__main__.py", "import argparse\nap = argparse.ArgumentParser()\n")
         self.assertEqual(Repo(self.dir).source_files(include_tests=False), [])
@@ -474,6 +485,25 @@ class Embeddability(Fixture):
         self.write(".env.example", "DB=x\n")
         self.write("Dockerfile", "FROM python\n")
         self.assertEqual(self.surface_level("embeddability", "service"), 3)
+
+
+class EnvDocumentation(Fixture):
+    def setup_service(self):
+        self.fastapi_service()
+        self.write("README.md", "Run:\n\n```\nuvicorn app.main:app\n```\n")
+        self.write("app/config.py", "import os\n\ndef env(key, default):\n    return os.environ.get(key, default)\n\n"
+                   "PORT = env('APP_PORT', 8000)\nDB = env('APP_DB_URL', '')\nLOG = env('APP_LOG_LEVEL', 'info')\n")
+
+    def test_docs_naming_the_variables_count(self):
+        self.setup_service()
+        self.assertEqual(self.first_missing("embeddability", "service"), "env-config")
+        self.write("docs/config.md", "| APP_PORT | port |\n| APP_DB_URL | database |\n")
+        self.assertNotEqual(self.first_missing("embeddability", "service"), "env-config")
+
+    def test_too_few_documented(self):
+        self.setup_service()
+        self.write("docs/config.md", "Set APP_PORT.\n")  # 1 of 3
+        self.assertEqual(self.first_missing("embeddability", "service"), "env-config")
 
 
 class Extensibility(Fixture):

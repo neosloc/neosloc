@@ -3,6 +3,20 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## 0.6.0
+
+Two criteria refinements for protocol servers and env-configured services (scores change):
+
+- **Embeddability (service L2):** configuration counts as documented when the docs name at
+  least half of the environment variables the code reads, as well as with a `.env` example
+  or a config schema. Variable names are taken from `X_Y` string literals in the files that
+  read the environment, so helpers like `env_or("APP_PORT", …)` are covered.
+- **Agent ergonomics (service L1, and the typed-errors part of L3):** a standard protocol's
+  native error replies (RESP errors, MQTT reason codes, gRPC status, SQLSTATE) count as
+  machine-readable, typed errors, when the project serves that protocol.
+- On the 11 validation repositories only geomqtt changes: ergonomics 0 → 1, embeddability
+  1 → 4.
+
 ## 0.5.1
 
 - **Interface: standard wire protocols are contracts.** A service that serves RESP, MQTT,

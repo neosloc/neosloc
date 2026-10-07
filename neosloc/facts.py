@@ -84,6 +84,12 @@ PROTOCOL_SERVERS = [
     ("SMTP server", "deps", r"\b(aiosmtpd|smtp-server|go-smtp|mailin)\b", True),
     ("WebSocket server", "code", r"accept_async\(|WebSocketServer\(|websockets\.serve\(|websocket\.Upgrader|tokio_tungstenite::accept", False),
 ]
+# Native error replies of standard protocols (only meaningful when the project serves one).
+PROTOCOL_ERRORS = re.compile(r"Resp[23]?Frame::(Error|SimpleError|BlobError)|\bFrame::Error\b|\bSimpleError\b|"
+                             r"['\"]-(ERR|WRONGTYPE)\b|\b\w*ReasonCode\b|ConnectReturnCode|tonic::Status|"
+                             r"Status::(new|invalid_argument|not_found|internal|unavailable)|status\.Error\(codes\.|"
+                             r"grpc\.StatusCode|SqlState")
+ENV_NAME_LITERAL = re.compile(r"""['"]([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)['"]""")
 LISTENER = re.compile(r"TcpListener::bind|UdpSocket::bind|net\.Listen\(|asyncio\.start_server|socketserver\.|"
                       r"createServer\(|ServerSocket\(|\.listen\(\s*\d|serve_forever\(")
 PROTOCOL_DOC = r"(^|/)(PROTOCOL|protocol|WIRE|wire)[\w.-]*\.(md|rst|txt|adoc)$|(^|/)docs?/[\w/-]*protocol[\w.-]*\.(md|rst)$|(^|/)asyncapi[\w.-]*\.(ya?ml|json)$"
@@ -300,6 +306,29 @@ class Facts:
                 out += [(Hit(h.path, name), app) for h in found[:1]]
             return out
         return [h for h, app in self._cached("protocols", compute) if app or not application_only]
+
+    def protocol_errors(self) -> Hits:
+        if not self.protocol_servers(application_only=True):
+            return []
+        return [Hit(h.path, "native protocol error replies") for h in self.grep(PROTOCOL_ERRORS)]
+
+    def env_var_names(self) -> List[str]:
+        """Variable names in files that read the environment (literal X_Y names, so helpers
+        such as env_or("APP_PORT", …) are covered)."""
+        names: Set[str] = set()
+        for h in self.grep(ENV_READ):
+            names |= set(ENV_NAME_LITERAL.findall(self.repo.code_text(h.path)))
+        return sorted(names)
+
+    def env_documented(self) -> Hits:
+        names = self.env_var_names()
+        if not names:
+            return []
+        docs = "\n".join(self.repo.read(f) for f in self.repo.doc_files())
+        documented = [n for n in names if n in docs]
+        if len(documented) * 2 >= len(names):
+            return [Hit(None, "%d of %d environment variables named in the docs" % (len(documented), len(names)))]
+        return []
 
     def protocol_doc(self) -> Hits:
         return [Hit(h.path, "protocol specification") for h in self.paths(PROTOCOL_DOC)]

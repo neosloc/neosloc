@@ -401,14 +401,17 @@ register(DimensionSpec(
     "Can an automated caller use it without guessing, and recover from failure?",
     {
         "service": [
-            Requirement(1, "json-errors", "Errors are consistent JSON.",
-                        lambda f: ok(f.grep(JSON_ERRORS_SVC) + f.grep(PROBLEM_DETAILS), "no consistent JSON errors")),
+            Requirement(1, "json-errors", "Errors are machine-readable: consistent JSON over HTTP, or a standard "
+                        "protocol's native error replies (RESP errors, MQTT reason codes, gRPC status, SQLSTATE).",
+                        lambda f: ok(f.grep(JSON_ERRORS_SVC) + f.grep(PROBLEM_DETAILS) + f.protocol_errors(),
+                                     "no machine-readable errors")),
             Requirement(2, "validation-pagination", "Field-level validation errors, and paginated lists.",
                         lambda f: all_of(ok(f.grep(VALIDATION) + f.deps(VALIDATION), "no request validation"),
                                          ok(f.grep(PAGINATION), "no pagination"))),
-            Requirement(3, "safe-retries", "Typed errors (RFC 9457 or equivalent), idempotent writes "
-                        "(Idempotency-Key), and rate-limit signals.",
-                        lambda f: all_of(ok(f.grep(PROBLEM_DETAILS) + f.deps(PROBLEM_DETAILS), "no typed errors"),
+            Requirement(3, "safe-retries", "Typed errors (RFC 9457 over HTTP, or a standard protocol's typed error "
+                        "codes), idempotent writes (Idempotency-Key), and rate-limit signals.",
+                        lambda f: all_of(ok(f.grep(PROBLEM_DETAILS) + f.deps(PROBLEM_DETAILS) + f.protocol_errors(),
+                                            "no typed errors"),
                                          ok(f.grep(IDEMPOTENCY), "no idempotency keys"),
                                          ok(f.grep(RATE_LIMIT) + f.deps(RATE_LIMIT), "no rate-limit signals"))),
             Requirement(4, "agent-ready", "Dry-run or validate-only, conditional requests, and agent docs.",
@@ -475,10 +478,11 @@ register(DimensionSpec(
         "service": [
             Requirement(1, "documented-run", "Runnable from source with documented steps (a README with commands).",
                         lambda f: ok([h for h in f.paths(README) if "```" in f.repo.read(h.path)], "no documented run steps")),
-            Requirement(2, "env-config", "Configured through environment variables, documented (.env example or "
-                        "config schema).",
+            Requirement(2, "env-config", "Configured through environment variables, documented: a .env example, a "
+                        "config schema, or docs naming at least half of the variables the code reads.",
                         lambda f: all_of(ok(f.grep(ENV_READ), "configuration isn't read from the environment"),
-                                         ok(f.paths(ENV_TEMPLATE), "no .env example or config schema"))),
+                                         ok(f.paths(ENV_TEMPLATE) + f.env_documented(),
+                                            "the environment variables aren't documented"))),
             Requirement(3, "container", "A container image.", lambda f: ok(f.paths(DOCKERFILE), "no Dockerfile")),
             Requirement(4, "composition", "Composition artifacts (compose, Helm, IaC).",
                         lambda f: ok(f.paths(COMPOSITION) + f.config(re.compile(r"^kind:\s*(Deployment|StatefulSet)", re.M)),
