@@ -107,19 +107,31 @@ def exit_classes(f: Facts):
 
 
 def _service_contract_coverage(f: Facts):
+    """Met when one transport's contract fully covers it (the best way in)."""
     if f.generated_spec():
         return [Hit(h.path, "generated from code: " + h.detail) for h in f.generated_spec()]
-    if not f.api_specs():
-        return "no contract"
     cov = f.spec_coverage()
-    if cov is None or cov >= 0.8:
+    if f.api_specs() and (cov is None or cov >= 0.8):
         return f.api_specs()
-    return "the contract covers ~%d%% of declared routes" % round(cov * 100)
+    if f.protocol_servers(application_only=True) and f.protocol_doc():
+        return f.protocol_servers(application_only=True)[:1] + f.protocol_doc()[:1]
+    if f.protocol_servers(application_only=True):
+        return "the application layer over %s (commands, topics, payloads) isn't specified" \
+            % f.protocol_servers(application_only=True)[0].detail
+    if f.api_specs():
+        return "the contract covers ~%d%% of declared routes" % round(cov * 100)
+    return "no contract"
 
 
 def _second_surface(f: Facts):
-    return ok(f.mcp_server() + (f.json_output() if f.entry_points() else []) + f.paths(SDK_DIRS)[:1],
-              "only one programmatic surface")
+    transports = [("HTTP", f.route_hits()[:1]), ("MCP", f.mcp_server()[:1]),
+                  ("CLI JSON output", f.json_output()[:1] if f.entry_points() else []),
+                  ("SDK", f.paths(SDK_DIRS)[:1])]
+    transports += [(h.detail, [h]) for h in f.protocol_servers()]
+    present = [(name, hits) for name, hits in transports if hits]
+    if len(present) >= 2:
+        return [Hit(hits[0].path, name) for name, hits in present]
+    return "only one programmatic surface"
 
 
 def _cli_help(f: Facts):
@@ -136,15 +148,20 @@ register(DimensionSpec(
     "Can another program use it through a documented, machine-readable surface?",
     {
         "service": [
-            Requirement(1, "routes", "Routes (or an MCP server) exist.",
-                        lambda f: ok(f.route_hits() + f.mcp_server(), "no routes")),
+            Requirement(1, "routes", "A network surface exists: HTTP routes, an MCP server, or a standard "
+                        "protocol listener.",
+                        lambda f: ok(f.route_hits() + f.mcp_server() + f.protocol_servers(), "no network surface")),
             Requirement(2, "contract", "A contract exists: a checked-in OpenAPI/GraphQL/protobuf/AsyncAPI spec, "
-                        "a framework-generated spec, or MCP tool schemas.",
-                        lambda f: ok(f.api_specs() + f.generated_spec() + f.mcp_server(), "no machine-readable contract")),
-            Requirement(3, "coverage", "The contract covers at least 80% of declared routes (generated contracts do).",
+                        "a framework-generated spec, MCP tool schemas, or a standard application protocol that "
+                        "off-the-shelf clients speak (RESP, MQTT, gRPC, PostgreSQL wire, …).",
+                        lambda f: ok(f.api_specs() + f.generated_spec() + f.mcp_server()
+                                     + f.protocol_servers(application_only=True), "no machine-readable contract")),
+            Requirement(3, "coverage", "A contract covers its transport: an HTTP contract covers at least 80% of "
+                        "declared routes (generated contracts do), or the application layer over a standard "
+                        "protocol (commands, topics, payloads) is specified in a protocol document or AsyncAPI.",
                         _service_contract_coverage),
-            Requirement(4, "second-surface", "A second surface: an MCP server, a CLI with JSON output, or an SDK.",
-                        _second_surface),
+            Requirement(4, "second-surface", "A second surface: another transport (HTTP and a protocol, two "
+                        "protocols), an MCP server, a CLI with JSON output, or an SDK.", _second_surface),
         ],
         "cli": [
             Requirement(1, "non-interactive", "Invocable non-interactively: no prompts, or prompts guarded by a "

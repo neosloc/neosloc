@@ -70,6 +70,24 @@ GENERATED_SPEC = [
     ("Swashbuckle/NSwag", "deps", r"Swashbuckle|NSwag"),
     ("graphql server", "deps", r"strawberry-graphql|\bgraphene\b|apollo-server|@apollo/server|gqlgen|async-graphql|graphql-yoga"),
 ]
+# Standard wire protocols a server can speak. (name, where, pattern, application protocol?)
+# An application protocol means off-the-shelf clients can use the server (a contract);
+# a bare transport such as WebSocket carries custom messages, so it is only a surface.
+# Codec/broker libraries in manifests count only when the code also opens a listener,
+# so that client libraries (redis-py, paho, fred) don't make a project a server.
+PROTOCOL_SERVERS = [
+    ("RESP (Redis wire protocol)", "deps", r"\b(redis-protocol|redis_protocol|redcon|resp-async)\b", True),
+    ("MQTT broker", "deps", r"\b(rumqttd|mqttbytes|ntex-mqtt|amqtt|hbmqtt|aedes|mochi-mqtt|moquette|mqtt-packet)\b", True),
+    ("gRPC server", "code", r"add_\w+Servicer_to_server|tonic::transport::Server|grpc\.NewServer\(|new\s+grpc\.Server\(", True),
+    ("PostgreSQL wire protocol", "deps", r"\b(pgwire|postgres-wire)\b", True),
+    ("Kafka protocol", "deps", r"\bkafka-protocol\b", True),
+    ("SMTP server", "deps", r"\b(aiosmtpd|smtp-server|go-smtp|mailin)\b", True),
+    ("WebSocket server", "code", r"accept_async\(|WebSocketServer\(|websockets\.serve\(|websocket\.Upgrader|tokio_tungstenite::accept", False),
+]
+LISTENER = re.compile(r"TcpListener::bind|UdpSocket::bind|net\.Listen\(|asyncio\.start_server|socketserver\.|"
+                      r"createServer\(|ServerSocket\(|\.listen\(\s*\d|serve_forever\(")
+PROTOCOL_DOC = r"(^|/)(PROTOCOL|protocol|WIRE|wire)[\w.-]*\.(md|rst|txt|adoc)$|(^|/)docs?/[\w/-]*protocol[\w.-]*\.(md|rst)$|(^|/)asyncapi[\w.-]*\.(ya?ml|json)$"
+
 MCP_SERVER = re.compile(r"\bFastMCP\(|from mcp\.server|@modelcontextprotocol/sdk/server|\bMcpServer\(|\bServerHandler\b"
                         r"|server\.NewMCPServer|mcp_server\.run\(")
 ARG_PARSING = re.compile(
@@ -268,6 +286,23 @@ class Facts:
 
     def mcp_server(self) -> Hits:
         return self.grep(MCP_SERVER)
+
+    def protocol_servers(self, application_only: bool = False) -> Hits:
+        """Standard protocols this project serves (not merely consumes)."""
+        def compute():
+            listener = bool(self.grep(LISTENER))
+            out = []
+            for name, where, rx, app in PROTOCOL_SERVERS:
+                if where == "deps":
+                    found = self.deps(re.compile(rx)) if listener else []
+                else:
+                    found = self.grep(re.compile(rx))
+                out += [(Hit(h.path, name), app) for h in found[:1]]
+            return out
+        return [h for h, app in self._cached("protocols", compute) if app or not application_only]
+
+    def protocol_doc(self) -> Hits:
+        return [Hit(h.path, "protocol specification") for h in self.paths(PROTOCOL_DOC)]
 
     def specs(self) -> List[Spec]:
         return self._cached("specs", lambda: find_specs(self.repo))

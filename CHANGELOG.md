@@ -3,6 +3,17 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## 0.5.1
+
+- **Interface: standard wire protocols are contracts.** A service that serves RESP, MQTT,
+  gRPC, PostgreSQL wire, Kafka or SMTP (detected from a protocol/broker library *and* a
+  listening socket, so client libraries don't count) meets the contract requirement, since
+  off-the-shelf clients speak it. Level 3 is met when the application layer on top
+  (commands, topics, payloads) is specified in a protocol document or AsyncAPI; each
+  protocol and HTTP count as separate transports for level 4. A bare WebSocket is a surface,
+  not a contract. Example: geomqtt (RESP in, MQTT out, PROTOCOL.md, HTTP) goes from 1 to 4.
+- `bench/` is excluded from product code like `benchmarks/`.
+
 ## 0.5.0
 
 - **New scoring model** (the criteria proposal, as decided):

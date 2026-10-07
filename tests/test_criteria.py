@@ -289,6 +289,49 @@ class Interface(Fixture):
         self.assertEqual(self.surface_level("interface", "library"), 4)
 
 
+class ProtocolServers(Fixture):
+    """Standard wire protocols are contracts (geomqtt: RESP in, MQTT out)."""
+
+    def server(self, deps, listener=True):
+        self.write("Cargo.toml", "[package]\nname = \"srv\"\n\n[dependencies]\n" + "".join('%s = "1"\n' % d for d in deps))
+        self.write("src/main.rs", "async fn run() {\n    let l = %s;\n}\n"
+                   % ("TcpListener::bind(addr).await?" if listener else "connect(addr).await?"))
+
+    def test_protocols_are_a_contract(self):
+        self.server(["redis-protocol", "mqttbytes"])
+        d = self.dim("interface")
+        self.assertEqual(self.results()[1].kinds, ["service"])
+        self.assertEqual(d.surfaces["service"]["first_missing"], "coverage")  # L2 met, app layer unspecified
+        self.assertIn("isn't specified", next(r["note"] for r in d.surfaces["service"]["requirements"] if r["id"] == "coverage"))
+
+    def test_specified_application_layer_and_second_transport(self):
+        self.server(["redis-protocol", "mqttbytes"])
+        self.write("PROTOCOL.md", "# Protocol\n\nTopics: geo/<set>/<z>/<x>/<y>, JSON payloads with an op field.\n")
+        self.assertEqual(self.surface_level("interface", "service"), 4)  # RESP + MQTT are two transports
+
+    def test_single_protocol_needs_a_second_surface(self):
+        self.server(["redis-protocol"])
+        self.write("PROTOCOL.md", "# Protocol\n")
+        self.assertEqual(self.surface_level("interface", "service"), 3)
+
+    def test_client_libraries_are_not_servers(self):
+        self.server(["fred", "rumqttc"], listener=False)
+        self.assertNotIn("service", self.results()[1].kinds)
+
+    def test_codec_without_listener_is_not_a_server(self):
+        self.server(["redis-protocol"], listener=False)
+        self.assertNotIn("service", self.results()[1].kinds)
+
+    def test_bare_websocket_is_a_surface_not_a_contract(self):
+        self.write("src/main.rs", "fn run() { let ws = tokio_tungstenite::accept_async(stream); }\n")
+        self.write("Cargo.toml", "[package]\nname = \"srv\"\n")
+        self.assertEqual(self.surface_level("interface", "service"), 1)
+
+    def test_benchmarks_are_not_product_code(self):
+        self.write("bench/__main__.py", "import argparse\nap = argparse.ArgumentParser()\n")
+        self.assertEqual(Repo(self.dir).source_files(include_tests=False), [])
+
+
 class Stability(Fixture):
     def setUp(self):
         super().setUp()

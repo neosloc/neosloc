@@ -62,7 +62,7 @@ def register(spec: DimensionSpec) -> DimensionSpec:
 
 def detect_surfaces(f: Facts) -> Surfaces:
     evidence: Dict[str, Hits] = {}
-    service = f.route_hits() + f.server()[:2] + f.mcp_server()[:1]
+    service = f.route_hits() + f.server()[:2] + f.mcp_server()[:1] + f.protocol_servers()
     if service:
         evidence["service"] = service
     if f.entry_points() and f.arg_parsing():

@@ -13,7 +13,7 @@ docs are built, so they always match the code.
 
     | Surface | Detected when |
     |---|---|
-    | `service` | HTTP routes are declared, a server framework is instantiated, or an MCP server exists. |
+    | `service` | HTTP routes are declared, a server framework is instantiated, an MCP server exists, or a standard protocol is served (RESP, MQTT, gRPC, PostgreSQL wire, Kafka, SMTP, WebSocket: a protocol or broker library plus a listening socket). |
     | `cli` | A declared entry point (console script, npm `bin`, Go `main`, Cargo binary) and argument parsing. |
     | `library` | A distributable package with an importable API (a Python package, an npm package with `main`/`exports` that isn't a web app, a Go module with non-`main` packages, a Rust lib crate). A service counts as a library only if it is published. |
     | `frontend` | An `index.html`, a frontend framework or bundler, and no service. |
@@ -68,6 +68,12 @@ opt out with a `neosloc: ignore` comment in its first five lines.
 <!-- neosloc:ladder interface -->
 
 Never `n/a`. A frontend alone, or no surface at all, is level 0.
+
+A standard application protocol is a contract in its own right: any off-the-shelf client
+can use the server. What it leaves open is the application layer on top (which commands,
+topics and payloads), so level 3 asks for that to be specified, in a protocol document or
+AsyncAPI. A bare WebSocket only carries custom messages, so it is a surface but not a
+contract.
 
 ## 2. Contract stability
 

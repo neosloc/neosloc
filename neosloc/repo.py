@@ -44,7 +44,7 @@ TEST_PATH_RE = re.compile(
 )
 
 EXAMPLE_PATH_RE = re.compile(
-    r"(^|/)(examples?|samples?|demos?|docs?|fixtures|benchmarks?"
+    r"(^|/)(examples?|samples?|demos?|docs?|fixtures|bench|benchmarks?"
     r"|vendored|third[_-]?party|external|libs)(/|$)"  # vendored code isn't this project's
 )
 
