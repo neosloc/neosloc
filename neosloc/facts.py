@@ -52,9 +52,11 @@ ROUTE_PATTERNS = [
     ("go-http", r"\.go$", r"\.(HandleFunc|Handle|GET|POST|PUT|PATCH|DELETE|Get|Post|Put|Patch|Delete)\(\s*\""),
     ("rust-axum/actix", r"\.rs$", r"\.route\(\s*\"|#\[(get|post|put|patch|delete)\(\s*\""),
     ("aspnet", r"\.cs$", r"\[Http(Get|Post|Put|Patch|Delete)\b|\.Map(Get|Post|Put|Patch|Delete)\("),
+    ("vapor/hummingbird", r"\.swift$", r"\b(app|routes|router|group|grouped\([^)]*\))\.(get|post|put|patch|delete|on)\(\s*\""),
 ]
 SERVER = re.compile(r"\bFastAPI\(|\bFlask\(|\bexpress\(\)|new\s+Hono\(|http\.ListenAndServe|HttpServer::new|axum::serve"
-                    r"|uvicorn\.run\(|\bapp\.listen\(|ROOT_URLCONF|WSGI_APPLICATION|createServer\(")
+                    r"|uvicorn\.run\(|\bapp\.listen\(|ROOT_URLCONF|WSGI_APPLICATION|createServer\("
+                    r"|Application\(\.detect|import Vapor\b|import Hummingbird\b")
 GENERATED_SPEC = [
     ("FastAPI (auto OpenAPI)", "code", r"\bFastAPI\("),
     ("django-ninja", "code", r"\bNinjaAPI\("),
@@ -99,8 +101,10 @@ MCP_SERVER = re.compile(r"\bFastMCP\(|from mcp\.server|@modelcontextprotocol/sdk
 ARG_PARSING = re.compile(
     r"\bimport (argparse|click|typer|fire|docopt)\b|from (click|typer) import|ArgumentParser\("
     r"|['\"](commander|yargs|oclif|meow|cac)['\"]|process\.argv"
-    r"|spf13/cobra|urfave/cli|\"flag\"|flag\.Parse\(|os\.Args|\bclap\b|std::env::args|picocli|String\[\] args")
-JSON_FLAG = re.compile(r"""['"]--(json|format|output)['"]|['"]-o['"]|\bjson=True\b|"json"\s*:\s*\{|--json\b""")
+    r"|spf13/cobra|urfave/cli|\"flag\"|flag\.Parse\(|os\.Args|\bclap\b|std::env::args|picocli|String\[\] args"
+    r"|import ArgumentParser\b|\b(Async)?ParsableCommand\b|CommandLine\.arguments")
+JSON_FLAG = re.compile(r"""['"]--(json|format|output)['"]|['"]-o['"]|\bjson=True\b|"json"\s*:\s*\{|--json\b"""
+                       r"""|@(Flag|Option)(\([^)]*\))?\s*var\s+(json|format|output)\b""")
 PROMPT = re.compile(r"(?<![\w.])input\(|getpass\(|click\.(prompt|confirm)\(|typer\.(prompt|confirm)\(|inquirer|"
                     r"readline\.question\(|promptui\.|dialoguer::|questionary\.|prompt_toolkit")
 NONINTERACTIVE_GUARD = re.compile(r"isatty\(\)|--yes\b|--no-input\b|--non-interactive\b|assume_yes|IsTerminal\(")
@@ -111,7 +115,8 @@ JSON_SCHEMA_CODE = re.compile(r"json-schema\.org/[\w/-]*schema|\"\$schema\"|'\$s
 DRY_RUN = re.compile(r"dry[-_ ]?run|--check\b|validate[-_]only|--plan\b")
 LIMIT_OPTIONS = re.compile(r"""['"]--(max[-_][\w-]+|timeout|budget|limit|deadline)['"]""")
 STDERR_DIAG = re.compile(r"file=sys\.stderr|sys\.stderr\.write|logging\.|getLogger\(|console\.error\(|eprintln!"
-                         r"|os\.Stderr|log\.(Print|Fatal)|System\.err")
+                         r"|os\.Stderr|log\.(Print|Fatal)|System\.err|FileHandle\.standardError|fputs\([^)]*stderr"
+                         r"|\bLogger\(\s*(subsystem|label)|os_log\(")
 NONZERO_EXIT = re.compile(r"sys\.exit\(\s*[1-9]|SystemExit\(|exit\(\s*[1-9]|os\.Exit\(\s*[1-9]|process\.exit\(\s*[1-9]"
                           r"|process::exit\(\s*[1-9]|return\s+(EXIT_\w+|[1-9])\b|exit_status|ExitCode")
 JSON_ERROR = re.compile(r"""["']error["']\s*:""")
@@ -123,10 +128,12 @@ TRACING = re.compile(r"opentelemetry|@opentelemetry/|go\.opentelemetry\.io|jaege
 METRICS = re.compile(r"prometheus|/metrics\b|statsd|micrometer|metrics\.NewCounter|prom-client|django-prometheus|starlette_exporter")
 HEALTH = re.compile(r"""['"`]/(health|healthz|healthcheck|ready|readyz|livez|ping)\b""")
 HEALTHCHECK_CFG = re.compile(r"^HEALTHCHECK\b|healthcheck:|livenessProbe|readinessProbe", re.M)
-STD_LOGGER = re.compile(r"getLogger\(__name__\)|getLogger\(['\"][\w.]+['\"]\)|require\(['\"]debug['\"]\)|log::(debug|info|warn)|\bslog\.|zap\.L\(\)|LoggerFactory")
+STD_LOGGER = re.compile(r"getLogger\(__name__\)|getLogger\(['\"][\w.]+['\"]\)|require\(['\"]debug['\"]\)|log::(debug|info|warn)|\bslog\.|zap\.L\(\)|LoggerFactory"
+                        r"|\bLogger\(\s*(subsystem|label)|import Logging\b|os_log\(|electron-log|QLoggingCategory|Serilog|NLog")
 PRINT_CALL = re.compile(r"^\s*print\(", re.M)
-LOG_LEVEL_CALL = re.compile(r"\blogger\.(debug|info|warning|warn|error|exception|critical)\(|\blogging\.(debug|info|warning|error)\(")
-EXCEPTION_CLASS = re.compile(r"^class\s+\w+\((\w+\.)?(\w*Error|\w*Exception)\)", re.M)
+LOG_LEVEL_CALL = re.compile(r"\b(?:self\.|Self\.)?(?:log|logger|LOG|LOGGER|logging)\.(debug|info|notice|warning|warn|error|exception|critical|fault|trace)\(")
+EXCEPTION_CLASS = re.compile(r"^class\s+\w+\((\w+\.)?(\w*Error|\w*Exception)\)"
+                             r"|^\s*(public\s+|internal\s+)?(enum|struct|class)\s+\w+\s*:\s*[^{\n]*\b(Error|LocalizedError)\b", re.M)
 SYS_EXIT = re.compile(r"\bsys\.exit\(|\bexit\(\d")
 ARG_VALIDATION = re.compile(r"raise\s+(ValueError|TypeError|\w+Error)\(\s*f?['\"]|throw\s+new\s+(TypeError|RangeError|Error)\(")
 TIMEOUT_PARAM = re.compile(r"\btimeout\s*[:=]")
@@ -163,7 +170,8 @@ PROFILES = re.compile(r"""['"]--profile['"]|\bprofiles?\b.*\b(config|credentials
 # Portability
 OWNS_DATA_PATH = re.compile(r"(^|/)(migrations/|alembic/|db/migrate/|prisma/schema\.prisma$|schema\.sql$|liquibase|flyway|ent/schema/)")
 OWNS_DATA_CODE = re.compile(r"models\.Model\b|declarative_base\(|DeclarativeBase\b|@Entity\b|gorm\.Model|#\[derive\([^)]*Queryable|"
-                            r"sequelize\.define|mongoose\.Schema|sqlite3\.connect\(|ActiveRecord::Base|Eloquent")
+                            r"sequelize\.define|mongoose\.Schema|sqlite3\.connect\(|ActiveRecord::Base|Eloquent|"
+                            r"NSPersistentContainer|NSManagedObject|import SwiftData\b|@Model\b|import GRDB\b|import RealmSwift\b|tauri-plugin-sql")
 DB_DRIVERS = re.compile(r"\b(psycopg2?|asyncpg|mysqlclient|pymysql|pymongo|motor|\"pg\"|mysql2|mongodb|sqlx|diesel|gorm|"
                         r"sqlalchemy|django|prisma|typeorm|sequelize|mongoose)\b", re.I)
 EXPORT = re.compile(r"""(def|function|func|fn)\s+\w*(export|backup)\w*\s*\(|['"`]/[\w/{}:<>.-]*\b(export|dump|backup)\b|add_parser\(\s*['"](export|dump|backup)""")
@@ -187,7 +195,7 @@ DOCKERFILE = r"(^|/)(Dockerfile|Containerfile)(\.[\w.-]+)?$"
 COMPOSITION = r"(^|/)((docker-)?compose(\.[\w.-]+)?\.ya?ml|Chart\.yaml|[\w.-]+\.tf|Pulumi\.ya?ml)$"
 ENV_TEMPLATE = r"(^|/)\.env[\w.-]*\.(example|sample|template|dist)$|[\w.-]*(config|settings)[\w.-]*\.schema\.json$"
 ENV_READ = re.compile(r"os\.environ|os\.getenv|getenv\(|process\.env\.|std::env::var|env::var\(|System\.getenv|ENV\[|BaseSettings\b|envconfig")
-PUBLISH = re.compile(r"pypa/gh-action-pypi-publish|twine upload|npm publish|cargo publish|goreleaser|gem push|poetry publish|uv publish|flit publish")
+PUBLISH = re.compile(r"pypa/gh-action-pypi-publish|twine upload|npm publish|cargo publish|goreleaser|gem push|poetry publish|uv publish|flit publish|pod trunk push")
 SINGLE_BINARY = r"(^|/)(\.goreleaser\.ya?ml|[\w.-]+\.spec)$"
 EXTRAS = re.compile(r"\[project\.optional-dependencies\]|extras_require|peerDependenciesMeta|\[features\]")
 
@@ -198,6 +206,42 @@ OUT_OF_TREE = re.compile(r"metadata\.entry_points\(|\bentry_points\(\s*group\s*=
                          r"stevedore|ServiceLoader\.load|plugin\.Open\(|pkgutil\.iter_modules|import_module\([^)]*(plugin|config)")
 EXT_API_VERSION = re.compile(r"(PLUGIN|EXTENSION|HOOK)_?API_?VERSION|api_version\s*=|apiVersion\b", re.I)
 HOOKS = re.compile(r"\bhookimpl\b|\bhookspec\b|add_action\(|add_filter\(|register_hook|addHook|\bon_(start|finish|load|init)\b")
+
+# Desktop GUI applications: (toolkit, where, pattern)
+DESKTOP_TOOLKITS = [
+    ("Electron", "deps", r'"electron"\s*:'),
+    ("Tauri", "path", r"(^|/)(src-tauri/tauri\.conf\.json|tauri\.conf\.json)$"),
+    ("Qt", "code+deps", r"\b(PyQt[56]|PySide[26])\b|QApplication\(|QGuiApplication\(|find_package\(Qt[56]"),
+    ("GTK", "code+deps", r"gi\.repository import Gtk|Gtk\.Application|\bgtk4?\s*=|gtkmm|libadwaita"),
+    ("Tkinter", "code", r"^\s*(import tkinter|from tkinter)"),
+    ("wxWidgets", "code+deps", r"\bimport wx\b|wxPython|wx/wx\.h"),
+    ("WPF/WinForms", "config", r"<UseWPF>true|<UseWindowsForms>true|<UseMaui>true"),
+    ("Avalonia", "deps", r"\bAvalonia\b"),
+    ("JavaFX/Swing", "code+deps", r"\bjavafx\b|javax\.swing"),
+    ("Compose Desktop", "deps", r"compose\.desktop"),
+    ("Rust GUI", "deps", r"\b(eframe|egui|iced|slint|druid)\s*="),
+    ("Fyne/Wails", "deps", r"fyne\.io/fyne|wailsapp/wails"),
+    ("Flutter desktop", "path", r"^(macos|windows|linux)/(Runner|runner|flutter)/"),
+]
+# macOS app with SwiftUI/AppKit (SwiftUI alone may be iOS).
+MACOS_APP = re.compile(r"\bimport (AppKit|Cocoa)\b|NSApplication\b|NSWindow\b|\bMenuBarExtra\b|\.macOS\(\.v|MACOSX_DEPLOYMENT_TARGET|SDKROOT = macosx")
+URL_SCHEME = re.compile(r"CFBundleURLTypes|CFBundleDocumentTypes|x-scheme-handler|setAsDefaultProtocolClient|"
+                        r"\"(protocols|fileAssociations)\"\s*:|deep-link|open-url|onOpenURL|application\(_:open|LSHandler")
+DESKTOP_ARGS = re.compile(r"process\.argv|CommandLine\.arguments|QCommandLineParser|sys\.argv|std::env::args|"
+                          r"getMatches\(|cli\s*:\s*\{|tauri_plugin_cli|ArgumentParser\(|clap::")
+AUTOMATION = re.compile(r"NSAppleScriptEnabled|OSAScriptingDefinition|import AppIntents\b|\bAppIntent\b|AppShortcutsProvider|"
+                        r"\bzbus\b|\bdbus\b|QDBus|Gio\.DBus|ComVisible|IDispatch")  # not ipcMain/tauri::command: internal UI IPC
+HEADLESS = re.compile(r"""['"]--(headless|batch|no-gui|nogui|cli|export)['"]|headless\s*[:=]\s*(true|True)|QT_QPA_PLATFORM""")
+AUTOMATION_CONTRACT = r"(^|/)[\w.-]+\.sdef$|(^|/)[\w.-]*(dbus|DBus)[\w.-]*\.xml$"
+INSTALLER = r"(^|/)(electron-builder\.(ya?ml|json)|forge\.config\.[jt]s|[\w.-]+\.wxs|[\w.-]+\.iss|[\w.-]+\.nsi|AppImageBuilder\.ya?ml|snapcraft\.ya?ml|[\w.-]+\.flatpak\.(json|ya?ml)|Package\.appxmanifest|[\w.-]+\.desktop|[\w.-]+\.spec)$"
+INSTALLER_CODE = re.compile(r"create-dmg|hdiutil|pkgbuild|productbuild|notarytool|\"bundle\"\s*:\s*\{|electron-builder|\[tool\.briefcase\]|cx_Freeze|pyinstaller", re.I)
+PACKAGE_MANAGER = re.compile(r"brew install --cask|Casks/|winget|chocolatey|choco install|flathub|snapcraft upload|snap install|"
+                             r"tauri-apps/tauri-action|electron-builder[^\n]*--publish|action-gh-release", re.I)
+MANAGED_CONFIG = re.compile(r"defaults write|\.mobileconfig|Group Policy|ADMX|managed preferences", re.I)
+CRASH_REPORTING = re.compile(r"sentry|crashpad|breakpad|crashlytics|bugsnag|MetricKit|PLCrashReporter|crashReporter\.start", re.I)
+DESKTOP_VERBOSITY = re.compile(r"""['"]--(verbose|debug|log[-_]level)['"]|\blog[_-]?[lL]evel\b|LogLevel\b""")
+CREDENTIAL_STORE = re.compile(r"\bKeychain\b|SecItemAdd|kSecClass|\bkeytar\b|safeStorage|libsecret|SecretService|"
+                              r"CredentialManager|PasswordVault|\bkeyring\b|tauri-plugin-stronghold|keyring-rs")
 
 # Legibility
 CI = r"(^|/)(\.github/workflows/[^/]+\.ya?ml|\.gitlab-ci\.yml|\.circleci/config\.yml|Jenkinsfile|\.travis\.yml|azure-pipelines\.yml|\.woodpecker\.ya?ml|bitbucket-pipelines\.yml)$"
@@ -211,13 +255,13 @@ SEMVER_TAG = re.compile(r"^v?\d+\.\d+(\.\d+)?([-+.].*)?$")
 CHANGELOG = re.compile(r"^((docs?|packages/[^/]+)/)?(CHANGELOG|CHANGES|HISTORY|NEWS|RELEASES?)(\.(md|rst|txt|adoc))?$", re.I)
 BREAKING_MARK = re.compile(r"\bbreaking\b|\bincompatib|^#+\s*removed\b|\bdeprecat", re.I | re.M)
 DEPRECATION = re.compile(r"@Deprecated|@deprecated|DeprecationWarning|FutureWarning|#\[deprecated|\bdeprecated\s*=\s*True|"
-                         r"Deprecation:|Sunset:|\[Obsolete|warnings\.warn\(")
+                         r"Deprecation:|Sunset:|\[Obsolete|warnings\.warn\(|@available\([^)]*deprecated")
 VERSIONED_PATH = re.compile(r"""['"`]\^?/?(api/)?v\d+(/|['"`])""")
 FIX_SUBJECT = re.compile(r"\b(fix(e[sd])?|bug|hotfix|patch|regression|crash|broken|workaround|revert)\b", re.I)
 
 # Library / frontend
 FRONTEND_DEPS = re.compile(r"\"(react|vue|svelte|@angular/core|solid-js|preact|vite|webpack|parcel|next|nuxt)\"\s*:")
-API_DOCS_GEN = re.compile(r"sphinx\.ext\.autodoc|mkdocstrings|\bpdoc\b|typedoc|jsdoc|autodoc|rustdoc|godoc")
+API_DOCS_GEN = re.compile(r"sphinx\.ext\.autodoc|mkdocstrings|\bpdoc\b|typedoc|jsdoc|autodoc|rustdoc|godoc|swift-docc-plugin|\bjazzy\b")
 
 
 class Facts:
@@ -369,6 +413,9 @@ class Facts:
                 elif f.endswith("Cargo.toml") and re.search(r"\[\[bin\]\]", t):
                     out.append(Hit(f, "cargo bin"))
             out += [Hit(f, "cargo binary") for f in self.repo.files if re.search(r"(^|/)src/main\.rs$", f)]
+            for f in self.repo.glob(r"(^|/)Package\.swift$"):
+                if re.search(r"\.executable(Target)?\(", self.repo.read(f)):
+                    out.append(Hit(f, "swift executable"))
             out += [Hit(f, "go main") for f in self.code if f.endswith(".go")
                     and re.search(r"^package main\b", self.repo.read(f), re.M) and "func main(" in self.repo.read(f)]
             return out
@@ -466,6 +513,8 @@ class Facts:
                              for f in self.code if not re.search(r"(^|/)(cmd|internal)/", f)):
                 out.append(Hit(gomod[0], "Go module with exported packages"))
             out += [Hit(f, "Rust library crate") for f in self.repo.glob(r"^(crates/[^/]+/)?src/lib\.rs$")]
+            out += [Hit(f, "Swift package library") for f in self.repo.glob(r"^Package\.swift$")
+                    if re.search(r"\.library\(", self.repo.read(f))]
             return out
         return self._cached("library", compute)
 
@@ -484,6 +533,7 @@ class Facts:
                 out.append(Hit(h.path, "package entry point"))
         out += [Hit(h.path, "exported identifiers") for h in self.library() if "Go module" in h.detail]
         out += [Hit(h.path, "pub items") for h in self.library() if "Rust" in h.detail]
+        out += [Hit(h.path, "public access control") for h in self.library() if "Swift" in h.detail]
         return out
 
     def typed_api(self) -> Hits:
@@ -496,11 +546,62 @@ class Facts:
             if re.search(r'"(types|typings)"\s*:', self.repo.read(h.path)) or ts:
                 out.append(Hit(h.path, "TypeScript types"))
         out += [Hit(h.path, "statically typed language") for h in self.library()
-                if "Go module" in h.detail or "Rust" in h.detail]
+                if "Go module" in h.detail or "Rust" in h.detail or "Swift" in h.detail]
         return out
 
     def api_reference(self) -> Hits:
-        return self.config(API_DOCS_GEN) + self.deps(API_DOCS_GEN) + self.grep(API_DOCS_GEN, [f for f in self.repo.files if f.endswith("conf.py")])
+        return (self.config(API_DOCS_GEN) + self.deps(API_DOCS_GEN)
+                + self.grep(API_DOCS_GEN, [f for f in self.repo.files if f.endswith("conf.py")])
+                + [Hit(f, "DocC catalog") for f in sorted({p.split(".docc/")[0] + ".docc" for p in self.repo.files if ".docc/" in p})])
+
+    def published(self) -> Hits:
+        """Released to where consumers install from: a registry upload in CI, or for Swift
+        packages (resolved by git tag) semver tags."""
+        out = self.workflows(PUBLISH)
+        if self.repo.glob(r"^Package\.swift$") and self.semver_tags():
+            out.append(Hit("Package.swift", "Swift package released by semver tags"))
+        return out
+
+    # ---- desktop ------------------------------------------------------------
+
+    def desktop(self) -> Hits:
+        def compute():
+            out = []
+            for name, where, rx in DESKTOP_TOOLKITS:
+                r = re.compile(rx, re.M)
+                if where == "path":
+                    found = self.paths(rx)
+                elif where == "deps":
+                    found = self.deps(r)
+                elif where == "config":
+                    found = _hits({f: 1 for f in self.repo.files if f.endswith(".csproj") and r.search(self.repo.read(f))})
+                elif where == "code":
+                    found = self.grep(r)
+                else:
+                    found = self.grep(r) + self.deps(r)
+                out += [Hit(h.path, name) for h in found[:1]]
+            swiftui = self.grep(re.compile(r"\bimport (SwiftUI|AppKit|Cocoa)\b"))
+            project_files = self.repo.glob(r"\.xcodeproj/project\.pbxproj$") + self.repo.glob(r"(^|/)Package\.swift$")
+            macos = bool(self.grep(MACOS_APP)) or any(MACOS_APP.search(self.repo.read(p)) for p in project_files)
+            if swiftui and macos:  # SwiftUI alone may be an iOS app
+                out.append(Hit(swiftui[0].path, "macOS SwiftUI/AppKit"))
+            return out
+        return self._cached("desktop", compute)
+
+    def desktop_files(self) -> List[str]:
+        return list(self.code) + [f for f in self.repo.files if f.endswith((".plist", ".json", ".toml", ".xml", ".yml",
+                                                                              ".yaml", ".desktop", ".entitlements"))]
+
+    def url_scheme(self) -> Hits:
+        return _hits({f: len(URL_SCHEME.findall(self.repo.read(f))) for f in self.desktop_files()
+                      if URL_SCHEME.search(self.repo.read(f)) and not self.repo.is_test(f)})
+
+    def automation(self) -> Hits:
+        return _hits({f: len(AUTOMATION.findall(self.repo.read(f))) for f in self.desktop_files()
+                      if AUTOMATION.search(self.repo.read(f)) and not self.repo.is_test(f)})
+
+    def credential_store(self) -> Hits:
+        return self.grep(CREDENTIAL_STORE) + self.deps(CREDENTIAL_STORE)
 
     # ---- frontend -----------------------------------------------------------
 
@@ -592,6 +693,8 @@ class Facts:
                     nm = re.search(r'"name"\s*:\s*"([^"]+)"', t)
                     if nm:
                         names.add(nm.group(1).split("/")[-1])
+            elif f.endswith("Package.swift"):
+                names |= set(re.findall(r"\.executable\(\s*name:\s*\"([\w.-]+)\"", t))
             elif f.endswith("Cargo.toml") or f.endswith("go.mod"):
                 nm = re.search(r'^name\s*=\s*"([^"]+)"|^module\s+\S*?([\w.-]+)\s*$', t, re.M)
                 if nm:
@@ -608,6 +711,8 @@ class Facts:
             if f.endswith("package.json"):
                 m = re.search(r'"dependencies"\s*:\s*\{([^}]*)\}', t)
                 return len(re.findall(r'"[^"]+"\s*:', m.group(1))) if m else 0
+            if f.endswith("Package.swift"):
+                return len(re.findall(r"\.package\(", t))
         return None
 
     def seam_names(self) -> List[str]:

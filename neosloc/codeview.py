@@ -51,6 +51,7 @@ PY_REGEX_CALLS = {"compile", "search", "match", "fullmatch", "findall", "findite
 C_REGEX_CALL = re.compile(
     r"(RegExp|MustCompile|regexp\.Compile|Regex::new|RegexBuilder::new|Pattern\.compile|new\s+Regex|Regex\.(?:Match|IsMatch|Replace)"
     r"|preg_\w+|Pattern\(|toRegex|Regex)\s*\(\s*$"
+    r"|NSRegularExpression\(\s*pattern:\s*$"  # Swift
 )
 JS_REGEX_PREV = set("(,=:[!&|?{};+-*%<>~^")
 JS_REGEX_KEYWORDS = ("return", "typeof", "case", "do", "else", "in", "of", "yield", "await")
@@ -165,6 +166,16 @@ def _c_like(text: str, js: bool, keep_regex: bool) -> str:
             end = n if j < 0 else j + 2
             out.append("\n" * text.count("\n", i, end))
             i = end
+            continue
+        if text.startswith('"""', i):  # Swift, Kotlin and Java text blocks
+            j = text.find('"""', i + 3)
+            j = n if j < 0 else j + 3
+            literal = text[i:j]
+            if is_prose(literal[3:-3]):
+                literal = '"""' + re.sub(r"[^\n]", " ", literal[3:-3]) + '"""'
+            out.append(literal)
+            last_sig, last_word = '"', ""
+            i = j
             continue
         if c in "\"'`":
             j = _string_end(text, i, c)

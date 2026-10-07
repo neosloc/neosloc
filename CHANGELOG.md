@@ -13,6 +13,18 @@ breaking changes to the CLI, the JSON report or the scoring are called out expli
   published CLI or a standard service with client libraries is adopted in minutes. With
   `--agentic`, the probe's docs-only run and list tasks measure adoption. New options: `--buy-price`, `--horizon`, `--make-model`. New JSON field
   `make_or_buy` (additive; schema_version stays 2).
+- **Desktop GUI applications** are a fifth surface (Electron, Tauri, Qt, GTK, Tkinter,
+  wxWidgets, WPF/WinForms/MAUI, Avalonia, JavaFX/Swing, Compose Desktop, Rust GUI crates,
+  Fyne/Wails, Flutter desktop, macOS SwiftUI/AppKit), with their own ladders: interface
+  (arguments/URL schemes, automation interfaces, headless mode, automation contract),
+  embeddability (installers, package-manager distribution, managed settings), observability
+  (logs, verbosity, crash reports), ergonomics through the headless mode, identity through
+  OS credential stores. Internal UI IPC (Electron ipcMain, Tauri commands) is not counted
+  as automation. Products with a UI are adopted through it in minutes.
+- **Swift**: Swift Package Manager, swift-argument-parser, Vapor/Hummingbird, `Tests/`
+  targets, swift-log/os_log, `Error` types, `@available` deprecations, DocC, tag-based
+  SwiftPM releases, `"""` strings and `NSRegularExpression` in the code view.
+- Log-level usage is recognised on any logger variable (`log.debug(…)`), not only `logger`.
 - The steering rate is calibrated on neosloc's own build (2.2 estimated vs about 2 real
   days). neoCOCOMO's reproduce term is about 20× higher for neosloc; aligning it is open.
 

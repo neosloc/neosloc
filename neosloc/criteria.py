@@ -10,14 +10,15 @@ from __future__ import annotations
 import re
 from typing import List, Tuple
 
-from .facts import (AGENT_DOCS, BREAKING_MARK, COMPOSITION, CONDITIONAL, DEPRECATION, DOCKERFILE, DOCTEST,
+from .facts import (AUTOMATION_CONTRACT, CRASH_REPORTING, DESKTOP_ARGS, DESKTOP_VERBOSITY, HEADLESS, INSTALLER,
+                    INSTALLER_CODE, MANAGED_CONFIG, PACKAGE_MANAGER, AGENT_DOCS, BREAKING_MARK, COMPOSITION, CONDITIONAL, DEPRECATION, DOCKERFILE, DOCTEST,
                     DRY_RUN, ENV_READ, ENV_TEMPLATE, EVENT_HOOK_CLI, EVENT_STREAM_CLI, EXCEPTION_CLASS, EXPORT,
                     EXPORT_DOC, EXTRAS, EXT_API_VERSION, FILE_TOKEN_BUDGET, HEALTH, HEALTHCHECK_CFG, HOOKS, IDEMPOTENCY,
                     IMPORT, INTERNAL_EVENTS, JSON_ERRORS_SVC, LIMIT_OPTIONS, LOCKFILES, LOG_LEVEL_CALL, MANAGED_KEYS,
                     METRICS, NONZERO_EXIT, OAUTH, OIDC_SCIM, OPEN_FORMATS, OUTBOUND_WEBHOOK, OUT_OF_TREE, OWNS_DATA_PATH,
-                    PAGINATION, PRINT_CALL, PROBLEM_DETAILS, PROFILES, PUBLISH, RATE_LIMIT, README, RETRY_PARAM, SCOPES,
+                    PAGINATION, PRINT_CALL, PROBLEM_DETAILS, PROFILES, RATE_LIMIT, README, RETRY_PARAM, SCOPES,
                     SEAM, SECRET_FLAG, SECRET_LOGGED, SIGNED_WEBHOOK, SINGLE_BINARY, STD_LOGGER, STDERR_DIAG, STREAMING,
-                    STRUCTURED_LOG, SYS_EXIT, TIMEOUT_PARAM, TOKEN_AUTH, TRACING, VALIDATION, VERBOSITY, VERSIONED_PATH,
+                    STRUCTURED_LOG, SYS_EXIT, JSON_FLAG as JSON_FLAG_RX, TIMEOUT_PARAM, TOKEN_AUTH, TRACING, VALIDATION, VERBOSITY, VERSIONED_PATH,
                     CI, CLOUDEVENTS, CREDENTIAL_ENV, ENV_FALLBACK, ARG_VALIDATION, Facts, Hit, Hits)
 from .ladder import UNIVERSAL, DimensionSpec, Requirement, Surfaces, register
 
@@ -79,6 +80,20 @@ def universal_if(*kinds: str):
     def applicable(s: Surfaces) -> Tuple[List[str], str]:
         return ([UNIVERSAL] if any(s.has(k) for k in kinds) else []), "no %s surface" % ", ".join(kinds)
     return applicable
+
+
+def headless(f: Facts) -> Hits:
+    """The app's functions run without the GUI: a headless/batch flag or a companion CLI surface."""
+    ev = f.grep(HEADLESS)
+    if f.surfaces is not None and f.surfaces.has("cli"):
+        ev = ev + [Hit(h.path, "companion CLI") for h in f.surfaces.evidence["cli"][:1]]
+    return ev
+
+
+def gated_by_headless(check):
+    def run(f: Facts):
+        return check(f) if headless(f) else "no headless mode for automated callers"
+    return run
 
 
 # Reused checks
@@ -183,6 +198,20 @@ register(DimensionSpec(
             Requirement(4, "api-reference", "An API reference is generated from the code (autodoc, mkdocstrings, "
                         "typedoc, …).", lambda f: ok(f.api_reference(), "no generated API reference")),
         ],
+        "desktop": [
+            Requirement(1, "launch", "Launchable by other programs with input: command-line arguments, a URL scheme "
+                        "or file associations.",
+                        lambda f: ok(f.url_scheme() + f.grep(DESKTOP_ARGS), "no arguments, URL scheme or file associations")),
+            Requirement(2, "automation", "An automation interface: AppleScript, App Intents/Shortcuts, D-Bus, COM, "
+                        "IPC commands, or a local API.",
+                        lambda f: ok(f.automation() + f.route_hits() + f.mcp_server(), "no automation interface")),
+            Requirement(3, "headless", "Its functions run without the GUI (a headless/batch mode or a companion CLI).",
+                        lambda f: ok(headless(f), "nothing runs without the GUI")),
+            Requirement(4, "automation-contract", "The automation interface is specified machine-readably (an "
+                        "AppleScript sdef, D-Bus introspection XML, App Intents, an OpenAPI spec, MCP).",
+                        lambda f: ok(f.paths(AUTOMATION_CONTRACT) + f.grep(re.compile(r"\bAppIntent\b")) + f.api_specs()
+                                     + f.mcp_server(), "no machine-readable automation contract")),
+        ],
         "frontend": [
             Requirement(1, "programmatic", "A programmatic surface besides the UI.",
                         lambda f: "a UI is not a programmatic surface"),
@@ -193,7 +222,7 @@ register(DimensionSpec(
         ],
     },
     # Never n/a: having no programmatic surface is the lowest interface level, not an exemption.
-    lambda s: ([k for k in ("service", "cli", "library", "frontend") if s.has(k)] or ["none"], ""),
+    lambda s: ([k for k in ("service", "cli", "library", "desktop", "frontend") if s.has(k)] or ["none"], ""),
 ))
 
 
@@ -242,7 +271,7 @@ register(DimensionSpec(
         Requirement(4, "clean-history", "Across tagged releases, no OpenAPI operation, CLI option or __all__ "
                     "symbol was removed without first being deprecated.", _clean_history),
     ]},
-    universal_if("service", "cli", "library"),
+    universal_if("service", "cli", "library", "desktop"),
 ))
 
 
@@ -252,7 +281,7 @@ register(DimensionSpec(
 
 def _events_applicable(s: Surfaces) -> Tuple[List[str], str]:
     out = (["service"] if s.has("service") else []) + (["cli"] if s.has("cli") and s.long_running else [])
-    return out, "no service and no long-running CLI mode (batch CLIs and libraries have no events)"
+    return out, "no service and no long-running CLI mode (batch CLIs, libraries and desktop apps have no events)"
 
 
 def _robust_delivery(f: Facts):
@@ -304,8 +333,8 @@ register(DimensionSpec(
 
 def _identity_applicable(s: Surfaces) -> Tuple[List[str], str]:
     out = ["service"] if s.has("service") else []
-    if s.uses_credentials:
-        out += [k for k in ("cli", "library") if s.has(k)]
+    if s.uses_credentials or (s.has("desktop") and s.credential_store):
+        out += [k for k in ("cli", "library", "desktop") if s.has(k)]
     return out, "uses no credentials and has no service surface"
 
 
@@ -352,6 +381,14 @@ register(DimensionSpec(
                         lambda f: ok(f.grep(OIDC_SCIM) + f.deps(OIDC_SCIM), "no OIDC client credentials or SCIM")),
         ],
         "cli": CLIENT_IDENTITY,
+        "desktop": [
+            Requirement(1, "credential-store", "Credentials are kept in the OS credential store (Keychain, Credential "
+                        "Manager, Secret Service), not in plain files.",
+                        lambda f: ok(f.credential_store(), "credentials aren't kept in the OS credential store")),
+            Requirement(2, "automation-auth", "Automation and headless runs can authenticate without the GUI "
+                        "(credentials from the environment).",
+                        lambda f: ok(f.grep(CREDENTIAL_ENV), "only the GUI can authenticate")),
+            CLIENT_IDENTITY[2], CLIENT_IDENTITY[3]],
         "library": [CLIENT_IDENTITY[0],
                     Requirement(2, "credentials-documented", "The credential environment variables are documented.",
                                 _creds_documented),
@@ -432,6 +469,17 @@ register(DimensionSpec(
                                          ok(f.grep(LIMIT_OPTIONS, cli_files(f)), "no timeout/budget options"),
                                          ok(agent_docs(f), "no agent docs"))),
         ],
+        "desktop": [
+            Requirement(1, "headless-failures", "In headless mode, failures end with a non-zero exit status instead "
+                        "of a dialog.", gated_by_headless(lambda f: ok(f.grep(NONZERO_EXIT), "no non-zero exit"))),
+            Requirement(2, "streams-and-status", "In headless mode, data goes to stdout and diagnostics to stderr.",
+                        gated_by_headless(errors_on_stderr_and_exit_codes)),
+            Requirement(3, "typed-failures", "Documented exit statuses distinguish error classes, and headless output "
+                        "is machine-readable (JSON).",
+                        gated_by_headless(lambda f: all_of(exit_classes(f), ok(f.grep(JSON_FLAG_RX), "no JSON output")))),
+            Requirement(4, "agent-ready", "Dry-run for side-effecting operations, and agent docs.",
+                        gated_by_headless(lambda f: all_of(ok(f.grep(DRY_RUN), "no dry-run"), ok(agent_docs(f), "no agent docs")))),
+        ],
         "library": [
             Requirement(1, "typed-exceptions", "Errors are specific exception types, and library code never "
                         "calls sys.exit.",
@@ -449,7 +497,7 @@ register(DimensionSpec(
                                             "examples don't run as tests"))),
         ],
     },
-    only("service", "cli", "library"),
+    only("service", "cli", "library", "desktop"),
 ))
 
 
@@ -460,7 +508,7 @@ register(DimensionSpec(
 def _published_and_used_in_ci(f: Facts):
     names = f.command_names()
     used = f.workflows(re.compile(r"(^|[\s/])(%s)(\s|$)" % "|".join(map(re.escape, names)), re.M)) if names else []
-    return all_of(ok(f.workflows(PUBLISH), "not published to a registry"),
+    return all_of(ok(f.published(), "not published to a registry"),
                   ok(used, "the command isn't run in CI"))
 
 
@@ -500,18 +548,33 @@ register(DimensionSpec(
             Requirement(4, "container-or-binary", "Also shipped as a container image or a single binary.",
                         lambda f: ok(f.paths(DOCKERFILE) + f.paths(SINGLE_BINARY), "no container image or binary")),
         ],
+        "desktop": [
+            Requirement(1, "build-documented", "Buildable from source with documented steps (a README with commands).",
+                        lambda f: ok([h for h in f.paths(README) if "```" in f.repo.read(h.path)], "no documented build steps")),
+            Requirement(2, "installer", "Packaged as an installer (dmg/pkg, MSI/MSIX, AppImage/Flatpak/Snap, "
+                        "electron-builder, Tauri bundle, PyInstaller).",
+                        lambda f: ok(f.paths(INSTALLER) + f.grep(INSTALLER_CODE) + f.config(INSTALLER_CODE)
+                                     + f.workflows(INSTALLER_CODE), "no installer packaging")),
+            Requirement(3, "unattended-install", "Distributed for unattended installation: a package manager "
+                        "(Homebrew cask, winget, Chocolatey, Flathub, Snap) or release artifacts built in CI.",
+                        lambda f: ok(f.workflows(PACKAGE_MANAGER) + f.docs(PACKAGE_MANAGER), "no package-manager distribution or CI releases")),
+            Requirement(4, "managed-settings", "Settings can be managed without the GUI: documented environment "
+                        "variables or config file, macOS defaults/MDM profiles, or Windows policies.",
+                        lambda f: ok(f.env_documented() + f.paths(ENV_TEMPLATE) + f.docs(MANAGED_CONFIG)
+                                     + f.paths(r"\.mobileconfig$"), "settings only change through the GUI")),
+        ],
         "library": [
             Requirement(1, "importable", "Importable from source.", lambda f: ok(f.library(), "no package")),
             Requirement(2, "installable", "Installable as a package (a package manifest).",
                         lambda f: ok([Hit(h.path, "package manifest") for h in f.library()], "no package manifest")),
             Requirement(3, "published-minimal", "Published to a public registry, with at most %d runtime "
                         "dependencies." % MINIMAL_DEPS,
-                        lambda f: all_of(ok(f.workflows(PUBLISH), "not published to a registry"), _minimal_deps(f))),
+                        lambda f: all_of(ok(f.published(), "not published to a registry"), _minimal_deps(f))),
             Requirement(4, "optional-features", "Optional features behind extras/features.",
                         lambda f: ok(f.deps(EXTRAS), "no optional extras")),
         ],
     },
-    only("service", "cli", "library"),
+    only("service", "cli", "library", "desktop"),
 ))
 
 
@@ -575,6 +638,16 @@ register(DimensionSpec(
             Requirement(4, "tracing", "Tracing hooks (OpenTelemetry).",
                         lambda f: ok(f.grep(TRACING) + f.deps(TRACING), "no tracing hooks")),
         ],
+        "desktop": [
+            Requirement(1, "logs", "Writes logs through a standard logger (os_log/Logger, electron-log, logging, Qt "
+                        "categories).", lambda f: ok(f.grep(STD_LOGGER) + f.deps(STD_LOGGER), "no standard logging")),
+            Requirement(2, "verbosity", "Log verbosity can be raised for diagnosis (--verbose/--debug, a log-level "
+                        "setting).", lambda f: ok(f.grep(DESKTOP_VERBOSITY) + f.grep(VERBOSITY), "no verbosity control")),
+            Requirement(3, "crash-reports", "Crashes are reported (Sentry, Crashpad/Breakpad, Crashlytics, MetricKit).",
+                        lambda f: ok(f.grep(CRASH_REPORTING) + f.deps(CRASH_REPORTING), "no crash reporting")),
+            Requirement(4, "tracing", "Tracing or metrics (OpenTelemetry).",
+                        lambda f: ok(f.grep(TRACING) + f.deps(TRACING), "no tracing")),
+        ],
         "library": [
             Requirement(1, "standard-logger", "Logs through a standard logger namespace and never prints from "
                         "library code.",
@@ -584,7 +657,7 @@ register(DimensionSpec(
             Requirement(2, "log-levels", "Log levels are used meaningfully (at least two levels).",
                         lambda f: (lambda lv: [Hit(None, "levels: " + ", ".join(sorted(lv)))] if len(lv) >= 2
                                    else "fewer than two log levels used")(
-                            {m.group(1) or m.group(2) for p in library_code(f)
+                            {m.group(1) for p in library_code(f)
                              for m in LOG_LEVEL_CALL.finditer(f.repo.code_text(p))})),
             Requirement(3, "hooks", "Optional metrics or tracing hooks.",
                         lambda f: ok(f.grep(TRACING, library_code(f)) + f.grep(METRICS, library_code(f)),
@@ -593,7 +666,7 @@ register(DimensionSpec(
                         lambda f: ok(f.deps(TRACING), "no OpenTelemetry instrumentation")),
         ],
     },
-    only("service", "cli", "library"),
+    only("service", "cli", "library", "desktop"),
 ))
 
 
@@ -603,7 +676,7 @@ register(DimensionSpec(
 
 def _pinned(f: Facts):
     s = f.surfaces
-    exempt = (s is not None and s.has("library")) or f.runtime_deps() == 0
+    exempt = (s is not None and s.has("library") and not s.has("desktop")) or f.runtime_deps() == 0
     if exempt:
         return [Hit(None, "library or zero-dependency project: lockfile not required")]
     return ok(f.paths(LOCKFILES), "no lockfile (applications should pin dependencies)")

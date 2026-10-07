@@ -42,8 +42,8 @@ A buyer doesn't change the code. They install it and use its best way in, so buy
 
 | Step | Read from | Minutes, level 0 → 4 |
 |---|---|---|
-| Getting it running | Embeddability level of its best surface | CLI or library: 240, 60, 15, 2, 1 (source only … published to a registry). Service: 960, 240, 60, 15, 5 (undocumented setup … container … compose/Helm) |
-| First successful use | Interface level | 2400 (× size; no programmatic surface: wrap the UI), 240, 60, 10, 2 (specified contract plus a second surface such as client libraries) |
+| Getting it running | Embeddability level of its best surface | CLI or library: 240, 60, 15, 2, 1 (source only … published to a registry). Service: 960, 240, 60, 15, 5 (undocumented setup … container … compose/Helm). Desktop: 480, 120, 10, 2, 2 (build from source … installer … package manager) |
+| First successful use | Interface level, or the UI | 2400 (× size; no programmatic surface: wrap the UI), 240, 60, 10, 2 (specified contract plus a second surface such as client libraries). Products with a UI (desktop app, web frontend) are first used by a person through it: 5 |
 | Upgrades per year | Contract stability | 480, 240, 120, 30, 5 |
 
 So `pip install neosloc && neosloc .` costs minutes, and so does geomqtt

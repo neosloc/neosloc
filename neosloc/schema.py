@@ -76,7 +76,7 @@ DIMENSION = _obj({
               "description": "Best level among applicable surfaces; null when not applicable."},
     "level_name": {"enum": ["absent", "ad hoc", "partial", "solid", "exemplary", "n/a"]},
     "applicable": {"type": "boolean"},
-    "best_surface": {"type": ["string", "null"], "enum": ["service", "cli", "library", "frontend", "all", "none", None]},
+    "best_surface": {"type": ["string", "null"], "enum": ["service", "cli", "library", "desktop", "frontend", "all", "none", None]},
     "rationale": STR,
     "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"},
                  "description": "Met requirements of the best surface (signal = 'L<level> <id>')."},
@@ -88,7 +88,7 @@ DIMENSION = _obj({
 
 SURFACE_HITS = {"type": "array", "items": HIT}
 SURFACES = _obj({
-    "kinds": {"type": "array", "items": {"enum": ["service", "cli", "library", "frontend"]}},
+    "kinds": {"type": "array", "items": {"enum": ["service", "cli", "library", "desktop", "frontend"]}},
     "evidence": {"type": "object", "additionalProperties": SURFACE_HITS},
     "long_running": SURFACE_HITS,
     "owns_data": SURFACE_HITS,

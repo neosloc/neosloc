@@ -38,9 +38,9 @@ STATICALLY_TYPED = {"go", "rust", "java", "kotlin", "scala", "csharp", "c", "cpp
                     "swift", "dart", "typescript"}
 
 TEST_PATH_RE = re.compile(
-    r"(^|/)(tests?|__tests__|testing|testdata|test_data)(/|$)|^spec/"
+    r"(^|/)(tests?|Tests|__tests__|testing|testdata|test_data|\w+(UI)?Tests)(/|$)|^spec/"  # Swift: Tests/, AppTests/
     r"|(^|/)test_[^/]*\.py$|_test\.(py|go|rb|exs?)$"
-    r"|\.(test|spec)\.[jt]sx?$|Tests?\.(java|kt|cs)$|_spec\.rb$"
+    r"|\.(test|spec)\.[jt]sx?$|Tests?\.(java|kt|cs|swift)$|_spec\.rb$"
 )
 
 EXAMPLE_PATH_RE = re.compile(
@@ -57,7 +57,7 @@ GENERATED_MARK_RE = re.compile(r"@generated|Code generated .* DO NOT EDIT|<auto-
 MANIFEST_RE = re.compile(
     r"(^|/)(requirements[\w.-]*\.(txt|in)|pyproject\.toml|setup\.(py|cfg)|Pipfile|package\.json"
     r"|go\.mod|Cargo\.toml|pom\.xml|build\.gradle(\.kts)?|[\w.]+\.csproj|Gemfile|[\w-]+\.gemspec"
-    r"|composer\.json|mix\.exs)$"
+    r"|composer\.json|mix\.exs|Package\.swift|Podfile|Cartfile|pubspec\.yaml)$"
 )
 DOC_RE = re.compile(r"(\.(md|rst|adoc|txt)$|(^|/)docs?/)", re.I)
 CONFIG_RE = re.compile(r"\.(ya?ml|toml|ini|cfg|conf|json)$|(^|/)(Dockerfile|Containerfile)[\w.-]*$")

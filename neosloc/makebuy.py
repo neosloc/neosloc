@@ -53,10 +53,13 @@ INSTALL_MINUTES = {
     "cli": [240, 60, 15, 2, 1],        # source only ... published to a registry ... binary/container too
     "library": [240, 60, 15, 2, 1],
     "service": [960, 240, 60, 15, 5],  # undocumented setup ... env-configured ... container ... compose/Helm
+    "desktop": [480, 120, 10, 2, 2],   # build from source ... installer ... package manager ... managed settings
 }
 INSTALL_MINUTES_OTHER = 60              # frontend-only or nothing detected (embeddability n/a)
 # Minutes to the first successful use, by interface level (0..4); level 0 scales with size.
 FIRST_USE_MINUTES = [2400, 240, 60, 10, 2]
+# Products with a UI (desktop app, web frontend) are first used by a person through it.
+UI_FIRST_USE_MINUTES = 5
 # Upgrade minutes per year, by contract stability level (n/a: nothing to break).
 UPGRADE_MINUTES = {0: 480, 1: 240, 2: 120, 3: 30, 4: 5, None: 15}
 AGENT_OUTPUT_PER_HOUR = 7_500          # agent output tokens per hour of agent-assisted adoption work
@@ -148,6 +151,10 @@ def make_or_buy(dims: List[DimensionResult], legibility: Dict, value: Dict, esti
         install = INSTALL_MINUTES_OTHER
     if_level = iface.level if iface is not None and iface.level is not None else 0
     first_use = FIRST_USE_MINUTES[if_level] * (size if if_level == 0 else 1.0)
+    use_via = iface.best_surface if iface is not None else None
+    ui = [k for k in ("desktop", "frontend") if iface is not None and k in iface.surfaces]
+    if ui and UI_FIRST_USE_MINUTES < first_use:
+        first_use, use_via = UI_FIRST_USE_MINUTES, ui[0] + " UI"
     adoption_minutes = install + first_use
     upgrade_minutes = UPGRADE_MINUTES[stab.level if stab is not None else None]
     buy_tok = _tokens(adoption_minutes / 60.0 * AGENT_OUTPUT_PER_HOUR)
@@ -186,7 +193,7 @@ def make_or_buy(dims: List[DimensionResult], legibility: Dict, value: Dict, esti
         },
         "buy": {
             "via": {"install": emb.best_surface if emb is not None and emb.level is not None else None,
-                    "use": iface.best_surface if iface is not None else None},
+                    "use": use_via},
             "adoption_minutes": {"install": r(install), "first_use": r(first_use), "total": r(adoption_minutes)},
             "tokens": buy_tok,
             "model_cost": r(buy_model_cost),

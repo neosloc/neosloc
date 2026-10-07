@@ -11,7 +11,7 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 from .facts import Facts, Hits
 
-SURFACES = ("service", "cli", "library", "frontend")
+SURFACES = ("service", "cli", "library", "desktop", "frontend")
 UNIVERSAL = "all"
 
 # A check returns evidence when the requirement is met. An empty list, or a
@@ -46,6 +46,7 @@ class Surfaces:
     long_running: Hits
     owns_data: Hits
     uses_credentials: Hits
+    credential_store: Hits = field(default_factory=list)
 
     def has(self, kind: str) -> bool:
         return kind in self.kinds
@@ -69,11 +70,13 @@ def detect_surfaces(f: Facts) -> Surfaces:
         evidence["cli"] = f.entry_points()[:2] + f.arg_parsing()[:1]
     if f.library():
         evidence["library"] = f.library()
-    if f.frontend() and "service" not in evidence:
-        evidence["frontend"] = f.frontend()
+    if f.desktop():
+        evidence["desktop"] = f.desktop()
+    if f.frontend() and "service" not in evidence and "desktop" not in evidence:
+        evidence["frontend"] = f.frontend()  # an Electron/Tauri index.html is the desktop app's UI
     kinds = [k for k in SURFACES if k in evidence]
     return Surfaces(kinds, evidence, f.long_running() if "cli" in evidence else [],
-                    f.owns_data(), f.uses_credentials())
+                    f.owns_data(), f.uses_credentials(), f.credential_store() if "desktop" in evidence else [])
 
 
 @dataclass

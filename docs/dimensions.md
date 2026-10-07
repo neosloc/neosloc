@@ -16,7 +16,8 @@ docs are built, so they always match the code.
     | `service` | HTTP routes are declared, a server framework is instantiated, an MCP server exists, or a standard protocol is served (RESP, MQTT, gRPC, PostgreSQL wire, Kafka, SMTP, WebSocket: a protocol or broker library plus a listening socket). |
     | `cli` | A declared entry point (console script, npm `bin`, Go `main`, Cargo binary) and argument parsing. |
     | `library` | A distributable package with an importable API (a Python package, an npm package with `main`/`exports` that isn't a web app, a Go module with non-`main` packages, a Rust lib crate). A service counts as a library only if it is published. |
-    | `frontend` | An `index.html`, a frontend framework or bundler, and no service. |
+    | `desktop` | A desktop GUI toolkit: Electron, Tauri, Qt, GTK, Tkinter, wxWidgets, WPF/WinForms/MAUI, Avalonia, JavaFX/Swing, Compose Desktop, Rust GUI crates (egui, iced, slint), Fyne/Wails, Flutter desktop, or a macOS SwiftUI/AppKit app (SwiftUI alone may be iOS, so a macOS indicator is required). |
+    | `frontend` | An `index.html` with a `package.json`, and no service or desktop app (an Electron/Tauri `index.html` is the desktop app's UI). |
 
     Three more properties decide whether some dimensions apply: a **long-running mode**
     (`--watch`, `serve`, `daemon`), **owning persistent data** (migrations, ORM models,
@@ -43,6 +44,15 @@ docs are built, so they always match the code.
 | 2 | partial |
 | 3 | solid (the target of retrofit estimates) |
 | 4 | exemplary |
+
+## Languages
+
+Every language is inventoried and counted, and Python, JavaScript/TypeScript, Go, Rust,
+Java/Kotlin, C#, PHP, Ruby and **Swift** have dedicated patterns. For Swift that means
+Swift Package Manager (`Package.swift` executables, libraries and dependencies, tags as
+releases, `Package.resolved`), swift-argument-parser CLIs, Vapor/Hummingbird routes,
+`Tests/` targets, swift-log and `os_log`, `Error` types, `@available(*, deprecated…)`,
+DocC catalogs, and `"""` strings and `NSRegularExpression` patterns in the code view.
 
 ## What counts as evidence
 

@@ -62,7 +62,7 @@ OpenRouter models need no extra package, only `OPENROUTER_API_KEY`.
 ## Dimensions
 
 Each dimension asks one question, answered per **surface** (service, CLI, library,
-frontend) with a ladder of checkable requirements: a surface reaches level N when it meets
+desktop GUI app, frontend) with a ladder of checkable requirements: a surface reaches level N when it meets
 every requirement up to N, and the dimension takes the best surface's level. Dimensions
 that can't apply (events for a batch CLI, portability for a tool that stores no data) are
 reported as `n/a` and left out of the index.
