@@ -3,6 +3,35 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## 0.5.0
+
+- **New scoring model** (the criteria proposal, as decided):
+  - **Surfaces:** each project is detected as one or more of service, CLI, library and
+    frontend, and every dimension is answered per surface. A CLI is judged on `--json`,
+    exit statuses and `--quiet`, not on HTTP pagination.
+  - **Ladders:** levels are cumulative lists of checkable requirements instead of sums of
+    points. The report names the first unmet requirement of each surface, and `-v` shows
+    every ladder.
+  - **Best surface:** a dimension's level is the best level among its surfaces.
+  - **n/a:** dimensions that can't apply (events for libraries and batch CLIs, identity
+    without credentials, portability without persistent data) are `n/a`, by explicit
+    rules, and are left out of the index and the retrofit estimate.
+  - Existing thresholds are unchanged (32k/12k tokens, 0.3 test ratio, 70% typed).
+- **Expect different levels.** On the ten repositories used for validation, levels moved
+  in both directions; see the release notes. neosloc itself goes from 1.50 over 10
+  dimensions to 2.88 over 8.
+- **Breaking (JSON, schema_version 2):** `level` can be `null` (with `level_name` `n/a`);
+  new `question`, `applicable`, `best_surface` and per-surface `surfaces` ladders; the report
+  has a top-level `surfaces` block; `estimate` has `assessed_dimensions` and
+  `not_applicable`. Evidence signals are now `L<level> <requirement id>`.
+- **Breaking (library):** `neosloc.detectors` is replaced by `neosloc.facts` (observations),
+  `neosloc.criteria` (the ladders) and `neosloc.assess`.
+- The LLM reviewer audits requirement by requirement and skips `n/a` dimensions.
+- Fixes found while porting: prompts in helper modules now count against non-interactive
+  CLIs; a method named `entry_points()` no longer counts as plugin discovery; strings in
+  `specs.py` are no longer read as deprecation markers.
+- Docs: every requirement table is generated from `criteria.py`.
+
 ## 0.4.0
 
 - **JSON Schema for `--json` output**, printed by `neosloc --schema` and published in the

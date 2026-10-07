@@ -28,19 +28,36 @@ def to_text(report: Report, verbose: bool = False) -> str:
             "%s %d%%" % (k, round(100 * v / total)) for k, v in list(langs.items())[:6]))
     out.append("")
 
-    width = max(len(d.title) for d in report.dimensions)
+    surf = report.surfaces or {}
+    if surf:
+        props = [name for name, key in (("long-running", "long_running"), ("owns data", "owns_data"),
+                                         ("uses credentials", "uses_credentials")) if surf.get(key)]
+        out.append("Surfaces: %s%s" % (", ".join(surf.get("kinds") or []) or "none detected",
+                                       " (%s)" % ", ".join(props) if props else ""))
+        out.append("")
+
+    width = max([len(d.title) for d in report.dimensions] or [0])
     for d in report.dimensions:
+        if d.level is None:
+            out.append("%-*s  %s  %-11s  %s" % (width, d.title, "    ", "n/a", d.rationale))
+            out.append("")
+            continue
         bar = BAR * d.level + EMPTY * (4 - d.level)
         out.append("%-*s  %s  %d %-9s  %s" % (width, d.title, bar, d.level, d.level_name, d.rationale))
-        evidence = d.evidence if verbose else d.evidence[:4]
+        evidence = d.evidence if verbose else d.evidence[-3:]
         for e in evidence:
             where = " (%s)" % e.path if e.path else ""
             detail = ": " + e.detail if e.detail else ""
             out.append("%s    + %s%s%s" % (" " * width, e.signal, detail, where))
-        if not verbose and len(d.evidence) > 4:
-            out.append("%s    + ... %d more (use -v)" % (" " * width, len(d.evidence) - 4))
         for g in d.gaps:
-            out.append("%s    - %s" % (" " * width, g))
+            out.append("%s    - next: %s" % (" " * width, g))
+        if verbose:
+            for name, res in d.surfaces.items():
+                out.append("%s    %s ladder (level %d):" % (" " * width, name, res["level"]))
+                for r in res["requirements"]:
+                    mark = "x" if r["met"] else " "
+                    note = "" if r["met"] or not r["note"] else " -- " + r["note"]
+                    out.append("%s      [%s] L%d %s%s" % (" " * width, mark, r["level"], r["text"], note))
         out.append("")
 
     if report.not_implemented:
@@ -49,7 +66,8 @@ def to_text(report: Report, verbose: bool = False) -> str:
 
     est = report.estimate
     a = est["assumptions"]
-    out.append("Integrability index (0-4, assessed dimensions):  %.2f" % est["integrability_index"])
+    out.append("Integrability index (0-4, %d applicable dimensions):  %.2f"
+               % (est.get("assessed_dimensions", len(report.dimensions)), est["integrability_index"]))
     out.append("Retrofit effort to level %d (agent-assisted):     %.1f person-days"
                % (a["target_level"], est["retrofit_person_days"]))
     out.append("Wrappability:                                     %s" % est["wrappability"])
@@ -115,10 +133,10 @@ def _agentic_lines(a, static_levels) -> list:
                           _k(s["tokens"]), cost))
         for t in run["tasks"]:
             mark = "ok " if t["success"] else "-- "
-            static = static_levels.get(t["dimension"])
+            static = static_levels.get(t["dimension"], "-")
             out.append("  %s[%s] %-9s %-12s %-26s (%d turns, %d tool calls, %s tok)%s"
                        % (mark, t["scope"], t["task"], t["outcome"],
-                          "%s static %s" % (t["dimension"], "-" if static is None else static),
+                          "%s static %s" % (t["dimension"], "n/a" if static is None else static),
                           t["turns"], t["tool_calls"], _k(t["input_tokens"] + t["output_tokens"]),
                           "" if t["success"] else ": " + "; ".join(t["problems"][:2])))
         if "documentation_gap" in run:
@@ -140,10 +158,11 @@ def _review_lines(r) -> list:
     for key, d in r["dimensions"].items():
         levels = ", ".join("-" if x.get("level") is None else str(x["level"]) for x in d["reviews"])
         mark = "  " if d["consensus"] in (None, d["static"]) else "! "
+        static = "n/a" if d["static"] is None else str(d["static"])
         first = next((x for x in d["reviews"] if x.get("level") is not None), None)
         why = (first["rationale"][:110] + ("..." if len(first["rationale"]) > 110 else "")) if first else ""
-        out.append("  %s%-14s static %d -> reviewed %s  [%s]  %s"
-                   % (mark, key, d["static"], "-" if d["consensus"] is None else d["consensus"], levels, why))
+        out.append("  %s%-14s static %s -> reviewed %s  [%s]  %s"
+                   % (mark, key, static, "-" if d["consensus"] is None else d["consensus"], levels, why))
     if r.get("reviewed_index") is not None:
         out.append("  Reviewed integrability index: %.2f" % r["reviewed_index"])
     if r["disagreements"]:

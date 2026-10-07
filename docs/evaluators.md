@@ -100,10 +100,12 @@ from the probe avoids a model grading its own reasoning.
 neosloc --review --review-model anthropic:claude-opus-5-5,openrouter:google/gemini-3.8-flash .
 ```
 
-For each dimension, each reviewer receives the question it asks, the meaning of the levels,
-the detector's level, rationale, evidence and gaps, and read access to the whole
-repository. It returns its own level, a rationale, any detector evidence it considers a
-false positive, and evidence the detector missed. The report shows:
+For each applicable dimension, each reviewer receives the question, every surface's ladder
+with the detector's verdict on each requirement (with evidence or the reason it failed),
+and read access to the whole repository. It returns the level the ladders give when applied
+correctly, the requirements it thinks were wrongly marked met (`false_positives`), and paths
+showing requirements wrongly marked unmet (`missed_evidence`). `n/a` dimensions aren't
+reviewed. The report shows:
 
 ```text
 LLM review (anthropic:claude-opus-5-5, openrouter:google/gemini-3.8-flash)

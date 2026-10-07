@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SCHEMA_ID = "https://ingmmo.com/neosloc/schema/report-v%d.json" % SCHEMA_VERSION
 
 LEVEL = {"type": "integer", "minimum": 0, "maximum": 4}
@@ -51,19 +51,54 @@ EVIDENCE = _obj({
     "weight": INT,
 })
 
+HIT = _obj({"path": {"type": ["string", "null"]}, "detail": STR})
+
+REQUIREMENT = _obj({
+    "level": dict(LEVEL, minimum=1),
+    "id": STR,
+    "text": STR,
+    "met": {"type": "boolean"},
+    "evidence": {"type": "array", "items": HIT},
+    "note": dict(STR, description="Why it isn't met (empty when met or unknown)."),
+})
+
+LADDER = _obj({
+    "level": LEVEL,
+    "first_missing": {"type": ["string", "null"], "description": "id of the first unmet requirement."},
+    "requirements": {"type": "array", "items": REQUIREMENT},
+})
+
 DIMENSION = _obj({
     "key": {"enum": DIMENSION_KEYS},
     "title": STR,
-    "level": LEVEL,
-    "level_name": {"enum": ["absent", "ad hoc", "partial", "solid", "exemplary"]},
+    "question": STR,
+    "level": {"type": ["integer", "null"], "minimum": 0, "maximum": 4,
+              "description": "Best level among applicable surfaces; null when not applicable."},
+    "level_name": {"enum": ["absent", "ad hoc", "partial", "solid", "exemplary", "n/a"]},
+    "applicable": {"type": "boolean"},
+    "best_surface": {"type": ["string", "null"], "enum": ["service", "cli", "library", "frontend", "all", "none", None]},
     "rationale": STR,
-    "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"}},
-    "gaps": {"type": "array", "items": STR, "description": "Missing practices, phrased as actions."},
-    "metrics": {"type": "object", "description": "Detector-specific measurements (open-ended)."},
+    "evidence": {"type": "array", "items": {"$ref": "#/$defs/evidence"},
+                 "description": "Met requirements of the best surface (signal = 'L<level> <id>')."},
+    "gaps": {"type": "array", "items": STR, "description": "First unmet requirement of each applicable surface."},
+    "surfaces": {"type": "object", "additionalProperties": LADDER,
+                 "description": "Ladder per applicable surface ('all' for universal dimensions)."},
+    "metrics": {"type": "object", "description": "Measurements (open-ended)."},
+})
+
+SURFACE_HITS = {"type": "array", "items": HIT}
+SURFACES = _obj({
+    "kinds": {"type": "array", "items": {"enum": ["service", "cli", "library", "frontend"]}},
+    "evidence": {"type": "object", "additionalProperties": SURFACE_HITS},
+    "long_running": SURFACE_HITS,
+    "owns_data": SURFACE_HITS,
+    "uses_credentials": SURFACE_HITS,
 })
 
 ESTIMATE = _obj({
-    "integrability_index": dict(NUM, minimum=0, maximum=4, description="Mean level of assessed dimensions."),
+    "integrability_index": dict(NUM, minimum=0, maximum=4, description="Mean level of applicable dimensions."),
+    "assessed_dimensions": INT,
+    "not_applicable": {"type": "array", "items": {"enum": DIMENSION_KEYS}},
     "retrofit_person_days": dict(NUM, minimum=0),
     "retrofit_by_dimension": {"type": "object", "additionalProperties": NUM},
     "wrappability": {"enum": ["already integrable", "cheap to wrap", "moderate retrofit", "expensive retrofit",
@@ -133,7 +168,7 @@ AGENTIC = _obj({
 REVIEW = _obj({
     "models": {"type": "array", "items": STR},
     "dimensions": {"type": "object", "additionalProperties": _obj({
-        "static": LEVEL,
+        "static": {"type": ["integer", "null"]},
         "reviews": {"type": "array", "items": _obj({
             "level": {"type": ["integer", "null"], "minimum": 0, "maximum": 4},
             "rationale": STR, "false_positives": {"type": "array", "items": STR},
@@ -150,6 +185,7 @@ REPORT = _obj({
     "target": dict(STR, description="Absolute path of the assessed repository."),
     "inventory": _obj({"files": INT, "source_files": INT, "source_tokens": INT,
                        "languages": {"type": "object", "additionalProperties": INT}, "git": {"type": "boolean"}}),
+    "surfaces": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/surfaces"}]},
     "dimensions": {"type": "array", "items": {"$ref": "#/$defs/dimension"}},
     "estimate": {"$ref": "#/$defs/estimate"},
     "not_implemented": {"type": "array", "items": STR},
@@ -185,6 +221,7 @@ def schema() -> Dict[str, Any]:
             {"$ref": "#/$defs/error"},
         ],
         "$defs": {"report": REPORT, "error": ERROR, "dimension": DIMENSION, "evidence": EVIDENCE,
+                  "surfaces": SURFACES,
                   "estimate": ESTIMATE, "value": VALUE, "agentic": AGENTIC, "run": RUN, "task": TASK,
                   "scope_summary": SCOPE_SUMMARY, "review": REVIEW},
     }

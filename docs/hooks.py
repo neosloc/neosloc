@@ -1,6 +1,6 @@
 """MkDocs hook: render reference material from the code so the docs can't drift.
 
-    <!-- neosloc:signals events -->   the signal table and level texts of a detector
+    <!-- neosloc:ladder events -->    a dimension's question and requirement ladders, per surface
     <!-- neosloc:cli -->              `neosloc --help`
     <!-- neosloc:tasks -->            the agentic task suite
     <!-- neosloc:schema -->           `neosloc --schema`
@@ -18,14 +18,24 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MARK = re.compile(r"<!-- neosloc:(\w+)(?: (\w+))? -->")
 
 
-def _signals(name):
-    mod = importlib.import_module("neosloc.detectors." + name)
-    out = ["| Signal | Looks in | Points | Gap reported when missing |", "|---|---|---|---|"]
-    for s in mod.SIGNALS:
-        out.append("| `%s` | %s | %s%s | %s |" % (s.name, s.where, s.points,
-                                                  " (group `%s`)" % s.group if s.group else "", s.gap or ""))
-    out += ["", "| Level | Meaning |", "|---|---|"]
-    out += ["| %d | %s |" % (k, v) for k, v in mod.WHY.items()]
+def _ladder(key):
+    from neosloc.assess import SPECS
+    from neosloc.ladder import UNIVERSAL
+    spec = next(sp for sp in SPECS if sp.key == key)
+    surfaces = [k for k in ("service", "cli", "library", "frontend", UNIVERSAL) if k in spec.ladders]
+    out = ["*%s*" % spec.question, ""]
+    if surfaces == [UNIVERSAL]:
+        out += ["| Level | Requirement |", "|---|---|"]
+        out += ["| %d | %s |" % (r.level, r.text) for r in sorted(spec.ladders[UNIVERSAL], key=lambda r: r.level)]
+        return "\n".join(out)
+    out += ["| Level | " + " | ".join(surfaces) + " |", "|---|" + "---|" * len(surfaces)]
+    for lvl in range(1, 5):
+        cells = []
+        for k in surfaces:
+            reqs = [r.text for r in spec.ladders[k] if r.level == lvl]
+            cells.append(" ".join(reqs) if reqs else "—")
+        if any(c != "—" for c in cells):
+            out.append("| %d | %s |" % (lvl, " | ".join(cells)))
     return "\n".join(out)
 
 
@@ -66,8 +76,8 @@ def on_page_markdown(markdown, **kwargs):
 
     def render(m):
         kind, arg = m.group(1), m.group(2)
-        if kind == "signals":
-            return _signals(arg)
+        if kind == "ladder":
+            return _ladder(arg)
         if kind == "cli":
             return _cli()
         if kind == "tasks":

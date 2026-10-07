@@ -14,15 +14,15 @@
 - LLM roles (probe, judge, review) all go through `agentic/loop.py:run_loop` over a
   provider-neutral `Conversation` (`agentic/llm.py`). New roles should do the same and
   charge the shared `Budget`.
-- A detector is `fn(repo, ctx) -> DimensionResult`, registered with `@register(key, title)`
-  from `neosloc/detectors/base.py`. Import order in `detectors/__init__.py` is report order;
-  `interface` runs first because it puts `specs`, `route_files`, `route_total` and
-  `has_surface` into `ctx`.
-- Signal-style detectors are tables of `Signal`s (`detectors/signals.py`). Trust library
-  names only in dependency manifests (`deps`), not in code, so neosloc's own regexes and
-  vendored code don't match.
-- Every level must be backed by `Evidence` with a path, and every missing point should
-  produce a `gap` phrased as an action.
+- Scoring is ladders of requirements per surface (`neosloc/criteria.py`, the specification;
+  docs/dimensions.md renders it). Checks combine facts from `neosloc/facts.py`, where all
+  pattern knowledge lives. `neosloc/ladder.py` detects surfaces and climbs ladders;
+  `neosloc/assess.py` picks the best surface. n/a is decided by applicability rules over
+  surfaces and properties, never by missing evidence.
+- Vocabulary files (`facts.py`, `criteria.py`, `specs.py`) start with `# neosloc: ignore`.
+  Trust library names only via `f.deps(...)` (manifests), never in code.
+- A check returns evidence (`Hit`s with paths) when met, or a short reason when not; the
+  first unmet requirement per surface becomes the gap.
 - Calibrate against real repos before changing thresholds; add a regression test for each
   false positive you fix.
 - Never call real model APIs in tests; use the fake client in `tests/test_agentic.py`,

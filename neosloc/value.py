@@ -70,7 +70,7 @@ def _capture(repo: Repo, dims: Dict[str, DimensionResult]) -> Dict[str, float]:
     test_ratio = leg.metrics.get("test_ratio", 0.0) if leg else 0.0
     tests = min(1.0, test_ratio / 0.5)
     iface = dims.get("interface")
-    contract = (iface.level / 4.0) if iface else 0.0
+    contract = (iface.level / 4.0) if iface and iface.level is not None else 0.0
     doc_tokens = sum(estimate_tokens(repo.read(f)) for f in repo.doc_files())
     docs = min(1.0, (doc_tokens / float(src_tokens)) / 0.2)
     total = 0.5 * tests + 0.25 * contract + 0.25 * docs
@@ -107,10 +107,10 @@ def value(repo: Repo, results: List[DimensionResult], salary: float = SLOCCOUNT_
     rediscover = knowledge * (1 - c)
     replacement = reproduce + rediscover
 
-    assessed = [d.level for d in results]
+    assessed = [d.level for d in results if d.level is not None]
     index = sum(assessed) / float(len(assessed)) if assessed else 0.0
     leverage = 0.75 + 0.125 * index
-    legibility = dims["legibility"].level if "legibility" in dims else 2
+    legibility = dims["legibility"].level if "legibility" in dims and dims["legibility"].level is not None else 2
     obsolescence = _staleness(hist["months_since_last"]) * (0.85 + 0.05 * legibility)
     val = replacement * leverage * obsolescence
 

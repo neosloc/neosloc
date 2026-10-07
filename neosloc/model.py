@@ -26,19 +26,27 @@ class Evidence:
 class DimensionResult:
     key: str
     title: str
-    level: int
+    level: Optional[int]          # None: not applicable to any surface of this project
     rationale: str
     evidence: List[Evidence] = field(default_factory=list)
     metrics: Dict[str, Any] = field(default_factory=dict)
     gaps: List[str] = field(default_factory=list)
+    question: str = ""
+    best_surface: Optional[str] = None
+    surfaces: Dict[str, Any] = field(default_factory=dict)   # surface -> ladder result
+
+    @property
+    def applicable(self) -> bool:
+        return self.level is not None
 
     @property
     def level_name(self) -> str:
-        return LEVEL_NAMES[self.level]
+        return "n/a" if self.level is None else LEVEL_NAMES[self.level]
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         d["level_name"] = self.level_name
+        d["applicable"] = self.applicable
         return d
 
 
@@ -50,6 +58,7 @@ class Report:
     estimate: Dict[str, Any]
     not_implemented: List[str]
     value: Optional[Dict[str, Any]] = None
+    surfaces: Optional[Dict[str, Any]] = None
     agentic: Optional[Dict[str, Any]] = None
     review: Optional[Dict[str, Any]] = None
     spend: Optional[Dict[str, Any]] = None
@@ -60,6 +69,7 @@ class Report:
             "schema_version": SCHEMA_VERSION,
             "target": self.target,
             "inventory": self.inventory,
+            "surfaces": self.surfaces,
             "dimensions": [d.to_dict() for d in self.dimensions],
             "estimate": self.estimate,
             "not_implemented": self.not_implemented,

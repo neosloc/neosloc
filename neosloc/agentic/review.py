@@ -19,29 +19,6 @@ from .llm import Budget
 from .loop import run_loop
 from .workspace import Workspace
 
-RUBRIC = {
-    "interface": "Is there a machine-readable contract (OpenAPI, GraphQL, protobuf, AsyncAPI, a framework-generated "
-                 "spec, or a typed library API) covering the implemented surface, and more than one surface (MCP, CLI "
-                 "with JSON output, SDK)?",
-    "stability": "Can integrators rely on the surface not changing under them: versioned releases, changelog, API "
-                 "versioning, deprecation before removal?",
-    "events": "Can other systems learn about changes without polling: outbound (ideally signed, self-service) "
-              "webhooks, streams, brokers, CDC, an AsyncAPI/CloudEvents contract?",
-    "identity": "Can a machine act with its own narrowly scoped, revocable identity: tokens, OAuth2/OIDC, scopes, "
-                "managed API keys or service accounts, SCIM?",
-    "portability": "Can all the data get out and in, in bulk, in open formats, with an explicit schema?",
-    "ergonomics": "Is the surface forgiving for automated callers: structured (RFC 9457) errors, validation, "
-                  "idempotency keys, pagination, rate-limit signals, dry-run, docs for agents?",
-    "embeddability": "Can another system run, configure and compose it without a human: container, "
-                     "compose/Helm/IaC, documented env config, headless entry point, library packaging?",
-    "extensibility": "Can behaviour be added without forking: plugin discovery, hooks, scripting, documented "
-                     "extension points?",
-    "observability": "Can an operator tell if it is working and why not: health/readiness, metrics, tracing, "
-                     "structured logs, error tracking?",
-    "legibility": "Can an agent change it safely with limited context: small modules, few import cycles, tests, "
-                  "types, CI, lockfiles, agent docs?",
-}
-
 REVIEW_TOOL = {
     "name": "submit_review",
     "description": "Submit the level you would assign to this dimension, with reasons.",
@@ -61,12 +38,16 @@ REVIEW_TOOL = {
 }
 
 SYSTEM = """You audit an automated integrability assessment of the software in this repository. \
-You can read the whole repository. You are given one dimension at a time: its question, the \
-meaning of the levels, the level an automated detector assigned, and the evidence it used.
+You can read the whole repository. You are given one dimension at a time: its question, and for \
+each surface of the project (service, cli, library, frontend) a ladder of requirements. A surface \
+reaches level N only when it meets every requirement of levels 1 to N; the dimension's level is \
+the best surface's level. For each requirement you see whether the detector found it met, with \
+its evidence or the reason it failed.
 
-Check the evidence against the code: is each piece real and relevant, and did the detector \
-miss practices that are present? Then call submit_review with the level you would assign. \
-Judge the software as it is, not the detector's thresholds."""
+Check the detector's verdicts against the code: is each "met" real, and is each "not met" truly \
+missing? Then call submit_review with the level the ladders give when applied correctly, and list \
+wrong verdicts (false_positives: requirements marked met that aren't; missed_evidence: paths \
+showing requirements marked unmet that are met)."""
 
 
 class Reviewer:
@@ -79,12 +60,15 @@ class Reviewer:
         conv = self.backend.conversation(SYSTEM, tools)
         prompt = json.dumps({
             "dimension": dim.title,
-            "question": RUBRIC.get(dim.key, ""),
+            "question": dim.question,
             "levels": LEVEL_NAMES,
             "detector_level": dim.level,
-            "detector_rationale": dim.rationale,
-            "detector_evidence": [{"signal": e.signal, "detail": e.detail, "path": e.path} for e in dim.evidence],
-            "detector_gaps": dim.gaps,
+            "best_surface": dim.best_surface,
+            "surfaces": {name: {"level": res["level"], "requirements": [
+                {"level": r["level"], "requirement": r["text"], "met": r["met"],
+                 "evidence": [e["path"] or e["detail"] for e in r["evidence"]][:3],
+                 "reason_not_met": r["note"] or None} for r in res["requirements"]]}
+                for name, res in dim.surfaces.items()},
         }, indent=2)
         res = run_loop(conv, prompt, ws.run, REVIEW_TOOL, self.budget, self.max_turns)
         out = dict(res.answer) if res.answer else {"level": None, "rationale": "no review (%s)" % res.outcome,
@@ -99,6 +83,8 @@ def review_all(repo: Repo, dims: List[DimensionResult], backends: List[Any], bud
     log = log or logger.info
     per_dim: Dict[str, Dict] = {}
     for dim in dims:
+        if dim.level is None:
+            continue  # not applicable: nothing to audit
         reviews = []
         for b in backends:
             if budget.exhausted:

@@ -1,3 +1,4 @@
+# neosloc: ignore (parses contracts; its strings are detection vocabulary)
 """Discovery and light parsing of machine-readable interface contracts.
 
 No YAML dependency: OpenAPI paths are extracted from JSON by parsing and from

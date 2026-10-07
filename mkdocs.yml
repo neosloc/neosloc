@@ -39,7 +39,6 @@ nav:
   - Getting started: getting-started.md
   - Concepts:
       - Dimensions: dimensions.md
-      - "Criteria (proposal)": criteria.md
       - Retrofit effort: estimate.md
       - "Value: neoCOCOMO": value.md
   - LLM evaluators:
@@ -49,6 +48,6 @@ nav:
       - Command line: cli.md
       - JSON output and schema: json.md
   - Contributing:
-      - Writing detectors: extending.md
+      - Writing criteria: extending.md
       - Calibration and limits: calibration.md
   - Changelog: changelog.md

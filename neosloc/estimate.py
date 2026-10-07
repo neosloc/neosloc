@@ -39,6 +39,8 @@ LEGIBILITY_MULT = {0: 2.5, 1: 1.6, 2: 1.0, 3: 0.75, 4: 0.5}
 
 
 def estimate(dims: List[DimensionResult], source_tokens: int) -> Dict:
+    not_applicable = [d.key for d in dims if d.level is None]
+    dims = [d for d in dims if d.level is not None]
     levels = {d.key: d.level for d in dims}
     leg = levels.get("legibility", 2)
     size_factor = min(4.0, max(0.5, math.sqrt(max(source_tokens, 1) / REFERENCE_TOKENS)))
@@ -55,7 +57,9 @@ def estimate(dims: List[DimensionResult], source_tokens: int) -> Dict:
 
     index = sum(levels.values()) / float(len(levels)) if levels else 0.0
     return {
-        "integrability_index": round(index, 2),   # 0..4, mean of assessed levels
+        "integrability_index": round(index, 2),   # 0..4, mean over applicable dimensions
+        "assessed_dimensions": len(levels),
+        "not_applicable": not_applicable,
         "retrofit_person_days": round(total, 1),  # agent-assisted effort to reach level 3
         "retrofit_by_dimension": per_dim,
         "wrappability": _grade(total, index),

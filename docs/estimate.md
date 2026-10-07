@@ -1,6 +1,9 @@
 # Retrofit effort
 
-How much agent-assisted work would bring every dimension up to level 3 ("solid")?
+How much agent-assisted work would bring every applicable dimension up to level 3
+("solid")? Dimensions that are `n/a` for the project are left out. The integrability index
+(the mean level) also covers only the applicable dimensions, and the report prints how many
+that is.
 
 ```text
 effort = Σ base[d] × (3 − level[d]) × legibility_multiplier × size_factor

@@ -16,7 +16,7 @@ neosloc --schema > neosloc.schema.json
 | `neosloc --json PATH1 PATH2 …` | a list of **reports**, with an **error** in place of each path that couldn't be assessed |
 | any failure before reports exist | an **error** |
 
-Every document has `schema_version` (currently `1`). It changes only when a field is
+Every document has `schema_version` (currently `2`). It changes only when a field is
 removed or changes meaning; new optional fields are added without a bump.
 
 Validate output in a pipeline:
@@ -33,8 +33,9 @@ python -m jsonschema --instance report.json schema.json      # or any draft 2020
 |---|---|
 | `target` | Absolute path of the repository. |
 | `inventory` | `files`, `source_files`, `source_tokens`, `languages` (tokens per language), `git`. |
-| `dimensions[]` | `key`, `title`, `level` (0–4), `level_name`, `rationale`, `evidence[]` (`signal`, `detail`, `path`, `weight`), `gaps[]`, `metrics` (detector-specific). |
-| `estimate` | `integrability_index`, `retrofit_person_days`, `retrofit_by_dimension`, `wrappability`, `assumptions`. See [Retrofit effort](estimate.md). |
+| `surfaces` | `kinds` (service, cli, library, frontend), the evidence for each, and the `long_running`, `owns_data` and `uses_credentials` properties. |
+| `dimensions[]` | `key`, `title`, `question`, `level` (0–4, or `null` when not applicable), `level_name` (`n/a` when null), `applicable`, `best_surface`, `rationale`, `evidence[]` (met requirements of the best surface), `gaps[]` (first unmet requirement per surface), `surfaces` (the full ladder per surface: each requirement's `level`, `id`, `text`, `met`, `evidence`, `note`), `metrics`. |
+| `estimate` | `integrability_index` (over applicable dimensions), `assessed_dimensions`, `not_applicable`, `retrofit_person_days`, `retrofit_by_dimension`, `wrappability`, `assumptions`. See [Retrofit effort](estimate.md). |
 | `value` | neoCOCOMO figures: `classic`, `capture`, `agent_factor`, `history`, `knowledge_at_risk`, `value_pm`, `value_cost`, `assumptions`. See [Value](value.md). |
 | `agentic` | With `--agentic`/`--judge`: `runs[]` (one per probe model; per-scope `summary`, per-task records, `documentation_gap`) and `panel`. Otherwise `null`. |
 | `review` | With `--review`: per-dimension reviews, `consensus`, `spread`, `reviewed_index`, `disagreements`. Otherwise `null`. |

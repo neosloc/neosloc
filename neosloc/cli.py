@@ -14,13 +14,13 @@ import time
 from typing import Any, Dict, List, Optional
 
 from . import __version__
-from .detectors import DIMENSIONS
+from .assess import assess, dimension_keys, surfaces_summary
 from .errors import (EXIT_INTERRUPTED, EXIT_OK, EXIT_PATH, InternalError, NeoslocError, PathError,
                      UsageError)
 from .estimate import estimate
 from .log import LEVELS, configure, logger
 from .model import Report
-from .repo import Repo, estimate_tokens
+from .repo import Repo
 from .report import to_text
 from .schema import SCHEMA_VERSION, dumps as schema_dumps
 from .value import SLOCCOUNT_OVERHEAD, SLOCCOUNT_SALARY, value
@@ -34,32 +34,17 @@ def analyze(path: str, only: Optional[List[str]] = None, salary: float = SLOCCOU
     except (NotADirectoryError, FileNotFoundError):
         raise PathError("not_a_directory", "not a directory: %s" % path, {"path": path})
     logger.debug("inventory: %d files", len(repo.files), extra={"files": len(repo.files), "git": repo.is_git})
-    ctx: dict = {}
-    results, skipped = [], []
-    for key, title, fn in DIMENSIONS:
-        if only and key not in only:
-            continue
-        if fn is None:
-            skipped.append(key)
-            continue
-        t = time.time()
-        results.append(fn(repo, ctx))
-        logger.debug("detector %s: level %d in %.2fs", key, results[-1].level, time.time() - t,
-                     extra={"detector": key, "dimension_level": results[-1].level, "seconds": round(time.time() - t, 3)})
-
-    leg = next((d for d in results if d.key == "legibility"), None)
-    langs = leg.metrics.get("languages", {}) if leg else {}
-    src_tokens = ctx.get("source_tokens")
-    if src_tokens is None:  # legibility wasn't run (--only)
-        src_tokens = sum(estimate_tokens(repo.read(f)) for f in repo.source_files(include_tests=False))
+    results, surfaces, facts = assess(repo, only)
+    leg = facts.legibility()
     inventory = {
         "files": len(repo.files),
-        "source_files": len(repo.source_files(include_tests=False)),
-        "source_tokens": src_tokens,
-        "languages": langs,
+        "source_files": leg["source_files"],
+        "source_tokens": leg["source_tokens"],
+        "languages": leg["languages"],
         "git": repo.is_git,
     }
-    report = Report(repo.root, inventory, results, estimate(results, src_tokens), skipped)
+    report = Report(repo.root, inventory, results, estimate(results, leg["source_tokens"]), [])
+    report.surfaces = surfaces_summary(surfaces)
     if with_value:
         report.value = value(repo, results, salary, overhead)
     logger.debug("assessed %s in %.2fs", repo.root, time.time() - started,
@@ -75,7 +60,7 @@ def run_evaluators(path: str, report: Report, args) -> None:
     """Attach LLM evaluations (probe, judge, review) to a static report."""
     from .agentic import DEFAULT_EFFORT, DEFAULT_MODEL, Budget, Judge, Probe, make_backend, panel, select
     from .agentic.review import review_all
-    from .detectors.interface import _count_routes
+    from .facts import Facts
 
     repo = Repo(path)
     effort = args.effort or DEFAULT_EFFORT
@@ -96,7 +81,7 @@ def run_evaluators(path: str, report: Report, args) -> None:
         for h in args.auth_header:
             k, _, v = h.partition(":")
             headers[k.strip()] = v.strip()
-        routes = sorted({f for hits in _count_routes(repo).values() for f in hits})
+        routes = Facts(repo).route_files()
         probe_specs = _specs(args.probe_model, DEFAULT_MODEL)
         judge = None
         if args.judge:
@@ -136,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     out.add_argument("--json", action="store_true", help="emit JSON (reports and errors) instead of text")
     out.add_argument("--schema", action="store_true", help="print the JSON Schema of --json output and exit")
     out.add_argument("-v", "--verbose", action="store_true", help="show all evidence in the text report")
-    out.add_argument("--only", help="comma-separated dimension keys to run (%s)" % ", ".join(k for k, _, _ in DIMENSIONS))
+    out.add_argument("--only", help="comma-separated dimension keys to run (%s)" % ", ".join(dimension_keys()))
     out.add_argument("--salary", type=float, default=SLOCCOUNT_SALARY,
                      help="annual salary for cost figures (default: sloccount's %(default)s)")
     out.add_argument("--overhead", type=float, default=SLOCCOUNT_OVERHEAD,
@@ -229,10 +214,10 @@ def _main(argv: List[str]) -> int:
         raise UsageError("usage", "the following arguments are required: paths", {"usage": ap.format_usage().strip()})
     only = [k.strip() for k in args.only.split(",")] if args.only else None
     if only:
-        unknown = [k for k in only if k not in {key for key, _, _ in DIMENSIONS}]
+        unknown = [k for k in only if k not in dimension_keys()]
         if unknown:
             raise UsageError("unknown_dimension", "unknown dimension(s): %s" % ", ".join(unknown),
-                             {"unknown": unknown, "known": [k for k, _, _ in DIMENSIONS]})
+                             {"unknown": unknown, "known": dimension_keys()})
     evaluating = args.agentic or args.judge or args.review
     if evaluating and len(args.paths) > 1:
         raise UsageError("usage", "--agentic/--judge/--review take a single path")

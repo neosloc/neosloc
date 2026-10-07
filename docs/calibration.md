@@ -7,8 +7,9 @@ reasoning next to it:
 
 | Where | What |
 |---|---|
-| `detectors/*.py` | signal points and level thresholds |
-| `detectors/legibility.py` | module (32k) and file (12k) token budgets, test and type ratios |
+| `criteria.py` | which requirements sit at which level, per surface; the dependency limit for "minimal" (10) |
+| `facts.py` | detection patterns; module (32k) and file (12k) token budgets |
+| `criteria.py` (legibility) | test (0.3) and typed (70%) ratios, module share (90%) |
 | `estimate.py` | person-days per level, size and legibility factors, wrappability bands |
 | `value.py` | agent floor, rediscovery share, person-months per fix and per change, capture weights, leverage, obsolescence |
 | `agentic/runner.py` | success-rate → level bands |
@@ -18,9 +19,9 @@ Treat the numbers as **rankings**, not measurements, until they are calibrated.
 ## How to calibrate
 
 1. **Detectors vs reviewers.** Run `neosloc --review --json` with two or three reviewer
-   models from different vendors over a varied set of repositories. Collect the
-   `disagreements`, read the reviewers' `false_positives` and `missed_evidence`, then fix
-   the detector or move a threshold. Add a regression test for each fix.
+   models from different vendors over a varied set of repositories. Reviewers judge each
+   requirement, so `false_positives` and `missed_evidence` point at a specific check in
+   `facts.py`/`criteria.py`. Fix it and add a regression test.
 2. **Static vs measured.** Run `neosloc --agentic --scope both` on the same set. Compare each
    task's outcome with the static level of the dimension it probes. A level-3 interface
    where the probe fails `list` and `create` from the docs means the detector rewards

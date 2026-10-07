@@ -59,6 +59,12 @@ OpenRouter models need no extra package, only `OPENROUTER_API_KEY`.
 
 ## Dimensions
 
+Each dimension asks one question, answered per **surface** (service, CLI, library,
+frontend) with a ladder of checkable requirements: a surface reaches level N when it meets
+every requirement up to N, and the dimension takes the best surface's level. Dimensions
+that can't apply (events for a batch CLI, portability for a tool that stores no data) are
+reported as `n/a` and left out of the index.
+
 | Key | Asks |
 |---|---|
 | `interface` | Is there a machine-readable contract covering the implemented surface, and more than one way in (MCP, CLI `--json`, SDK, typed library)? |
@@ -72,7 +78,7 @@ OpenRouter models need no extra package, only `OPENROUTER_API_KEY`.
 | `observability` | Health/readiness, metrics, tracing, structured logs, error tracking. |
 | `legibility` | The heir to SLOC: tokens per module, import cycles, tests, types, CI, lockfiles, agent docs. |
 
-Details: [dimensions](https://ingmmo.com/neosloc/dimensions/),
+Details, with every requirement: [dimensions](https://ingmmo.com/neosloc/dimensions/),
 [retrofit effort](https://ingmmo.com/neosloc/estimate/),
 [neoCOCOMO](https://ingmmo.com/neosloc/value/).
 
@@ -116,7 +122,7 @@ python -m unittest discover -s tests -t .     # no network, no API spend
 python -m neosloc .
 ```
 
-See [Writing detectors](https://ingmmo.com/neosloc/extending/) and `AGENTS.md`.
+See [Writing criteria](https://ingmmo.com/neosloc/extending/) and `AGENTS.md`.
 Releases: bump `neosloc/__init__.py`, add a `CHANGELOG.md` section, push a `vX.Y.Z` tag.
 
 MIT licensed.

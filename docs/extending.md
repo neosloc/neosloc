@@ -1,16 +1,16 @@
-# Writing detectors
+# Writing criteria
 
 ## Layout
 
 ```text
 neosloc/
   repo.py            file inventory, cached reads, git, classification (test/example/vendored/generated)
-  codeview.py        what content signals see: no comments, docstrings, prose or regex literals
+  codeview.py        what facts see: no comments, docstrings, prose or regex literals
   specs.py           OpenAPI/AsyncAPI/GraphQL/proto discovery and parsing (no YAML dependency)
-  detectors/
-    base.py          register(), the Context dict, the DIMENSIONS registry
-    signals.py       Signal tables and score_signals()
-    interface.py …   one module per dimension
+  facts.py           every observation (routes, entry points, docs, tags, …) with evidence
+  ladder.py          Requirement, DimensionSpec, register(), surface detection, ladder climbing
+  criteria.py        the ten dimensions as ladders: this file is the specification
+  assess.py          runs the criteria: surfaces -> ladders -> best surface
   estimate.py        retrofit effort
   value.py           neoCOCOMO
   agentic/           llm.py (providers), loop.py, runner.py (probe), judge.py, review.py,
@@ -18,72 +18,52 @@ neosloc/
   report.py, cli.py
 ```
 
-## The detector contract
+## Requirements and ladders
 
-A detector is a function `(repo, ctx) -> DimensionResult`, registered with a decorator:
+A dimension is a `DimensionSpec` registered with `register()` in `neosloc/criteria.py`:
 
 ```python
-from ..model import DimensionResult
-from .base import Context, register
-from .signals import Signal, level_from, score_signals
-
-SIGNALS = [
-    Signal("feature-flags", "code+deps", r"\b(unleash|launchdarkly|flipt|growthbook)\b", 1.0,
-           "Use a feature-flag service so integrations can be rolled out safely."),
-]
-WHY = {0: "…", 1: "…", 2: "…", 3: "…", 4: "…"}
-
-
-@register("rollout", "Rollout control")
-def detect(repo, ctx: Context) -> DimensionResult:
-    score, ev, found, gaps = score_signals(repo, ctx, SIGNALS)
-    level = level_from(score, (0.5, 1.5, 2.5, 3.5))
-    return DimensionResult("rollout", "Rollout control", level, WHY[level], ev,
-                           metrics={"score": score, "signals": sorted(found)}, gaps=gaps)
+register(DimensionSpec(
+    "rollout", "Rollout control",
+    "Can integrations be switched on gradually and safely?",
+    {UNIVERSAL: [
+        Requirement(1, "flags", "A feature-flag mechanism exists.",
+                    lambda f: ok(f.deps(FLAG_LIBS) + f.grep(FLAG_CODE), "no feature flags")),
+        Requirement(2, "per-client", "Flags can target individual clients or keys.", per_client_flags),
+        ...
+    ]},
+    lambda s: ([UNIVERSAL] if s.has("service") else []), "no service surface"),
+))
 ```
 
-Then import the module in `detectors/__init__.py`. Import order is report order. `interface`
-runs first because it puts `specs`, `route_files`, `route_total` and `has_surface` into
-`ctx` for later detectors.
+- **A check** takes the `Facts` and returns evidence (a non-empty list of `Hit`s) when the
+  requirement is met, or a short reason when it isn't. `ok(evidence, reason)` and
+  `all_of(...)` cover most cases; `absent(found, ...)` handles "never …" requirements.
+- **Ladders** are keyed by surface (`service`, `cli`, `library`, `frontend`) or
+  `UNIVERSAL`. Levels must be 1..N with no gaps; `tests/test_criteria.py` enforces this.
+- **Applicability** returns the surfaces the dimension applies to, plus the reason shown
+  when there are none (`n/a`). Write it as an explicit rule about surfaces and
+  properties (`s.long_running`, `s.owns_data`, `s.uses_credentials`), never as "no
+  evidence found".
+- **Pattern knowledge belongs in `facts.py`**: add a fact (a regex, or a method returning
+  `Hit`s) there and combine facts in `criteria.py`.
 
-## Signals
-
-`Signal(name, where, pattern, points, gap=None, group=None)`:
-
-| `where` | Searches |
-|---|---|
-| `code` | product source only |
-| `deps` | dependency manifests (transitive Go deps removed) |
-| `code+deps` | both |
-| `config` | YAML/TOML/JSON/INI/Dockerfiles outside tests |
-| `docs` | Markdown/reST/text and `docs/` trees |
-| `path` | file *paths*, not contents |
-| `routes` | files that declare HTTP routes |
-
-Signals in the same `group` score once (for example, problem+json *or* a generic error
-envelope). Gaps are reported only for signals that are missing and whose group wasn't
-otherwise satisfied.
+The docs render every ladder from these definitions (`<!-- neosloc:ladder <key> -->` in
+`docs/dimensions.md`), so a new requirement is documented as soon as it is added.
 
 ## Rules
 
 - **Every level needs evidence with a path**, and every missing point should produce a gap
   phrased as an action.
-- **Trust library names only in `deps`.** Code is matched through the code view
-  (`neosloc/codeview.py`), which drops comments, docstrings, prose strings and regex
-  literals, but ordinary identifier-like strings remain.
-- **Detector modules start with `# neosloc: ignore`**, so neosloc doesn't score itself on
-  its own vocabulary. `tests/test_codeview.py::SelfScan` enforces this.
-- **Add a regression test for every false positive you fix.** `tests/test_neosloc.py` builds
-  small fixture repositories in temporary directories.
+- **Trust library names only in dependency manifests** (`f.deps`). Code is matched through
+  the code view (`neosloc/codeview.py`), which drops comments, docstrings, prose strings and
+  regex literals, but ordinary identifier-like strings remain.
+- **Vocabulary files start with `# neosloc: ignore`** (`facts.py`, `criteria.py`,
+  `specs.py`), so neosloc doesn't score itself on its own patterns.
+  `tests/test_criteria.py::SelfScan` enforces this.
+- **Test each requirement both ways.** `tests/test_criteria.py` builds small fixture
+  repositories and checks that a surface climbs exactly one level when the requirement is
+  added. Add a regression test for every false positive you fix.
 - **Check against real repositories** before changing thresholds. `neosloc --review` with a
   couple of models is a quick way to find disagreements.
 
-## Tests
-
-```bash
-python -m unittest discover -s tests -t .
-```
-
-LLM code is tested without network access: a scripted fake client for Anthropic, a local
-mock of the Messages API for the real SDK (skipped when the SDK isn't installed), and a
-local mock of OpenRouter. Never call real model APIs from tests.

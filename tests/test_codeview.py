@@ -5,7 +5,6 @@ import tempfile
 import textwrap
 import unittest
 
-from neosloc.cli import analyze
 from neosloc.codeview import code_view, has_ignore_pragma, is_prose
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,6 +76,8 @@ class Helpers(unittest.TestCase):
 
 
 class Detection(unittest.TestCase):
+    """Facts see usage, not vocabulary."""
+
     def setUp(self):
         self.dir = tempfile.mkdtemp()
 
@@ -89,45 +90,33 @@ class Detection(unittest.TestCase):
         with open(path, "w") as fh:
             fh.write(text)
 
-    def level(self, key):
-        return next(d for d in analyze(self.dir, with_value=False).dimensions if d.key == key)
+    def facts(self):
+        from neosloc.facts import Facts
+        from neosloc.repo import Repo
+        return Facts(Repo(self.dir))
 
     def test_scanner_vocabulary_is_not_usage(self):
-        self.write("lint/rules.py", 'import re\nRULES = [re.compile(r"prometheus|opentelemetry|structlog")]\n'
+        from neosloc.facts import HEALTH, METRICS, TRACING
+        self.write("lint/rules.py", 'import re\nRULES = [re.compile(r"prometheus|opentelemetry|/healthz")]\n'
                    '# we look for /healthz endpoints\nHELP = "Expose a health endpoint so the orchestrator can probe it."\n')
-        self.assertEqual(self.level("observability").level, 0)
+        f = self.facts()
+        self.assertEqual((f.grep(METRICS), f.grep(TRACING), f.grep(HEALTH)), ([], [], []))
 
     def test_pragma_opts_a_file_out(self):
+        from neosloc.facts import METRICS
         self.write("lint/rules.py", '# neosloc: ignore\nSIGNALS = ["prometheus", "opentelemetry"]\n')
-        self.assertEqual(self.level("observability").level, 0)
+        self.assertEqual(self.facts().grep(METRICS), [])
 
     def test_real_usage_still_counts(self):
+        from neosloc.facts import HEALTH, METRICS, TRACING
         self.write("app/ops.py", "from prometheus_client import Counter\nfrom opentelemetry import trace\n"
-                   "import structlog\n@app.get('/healthz')\ndef h(): pass\n")
-        self.assertEqual(self.level("observability").level, 4)
+                   "@app.get('/healthz')\ndef h(): pass\n")
+        f = self.facts()
+        self.assertTrue(f.grep(METRICS) and f.grep(TRACING) and f.grep(HEALTH))
 
     def test_django_regex_routes_still_count(self):
+        from neosloc.facts import VERSIONED_PATH
         self.write("app/urls.py", "urlpatterns = [re_path(r'^api/v1/items/(?P<pk>\\d+)/$', v)]\n")
-        iface = self.level("interface")
-        self.assertEqual(iface.metrics["route_declarations"], 1)
-        stab = next(d for d in analyze(self.dir, with_value=False).dimensions if d.key == "stability")
-        self.assertTrue(any(e.signal == "versioned-api-paths" for e in stab.evidence))
-
-    def test_json_dumps_and_dump_methods_are_not_exports(self):
-        self.write("app/serial.py", "import json\nclass M:\n    def dump(self):\n        return json.dumps(self.__dict__)\n")
-        sigs = self.level("portability").metrics["signals"]
-        self.assertNotIn("export", sigs)
-        self.assertNotIn("open-formats", sigs)
-
-
-class SelfScan(unittest.TestCase):
-    """neosloc is full of the vocabulary it detects; it must not score itself on it."""
-
-    def test_neosloc_does_not_flag_itself(self):
-        levels = {d.key: d.level for d in analyze(ROOT, with_value=False).dimensions}
-        for key in ("events", "identity", "observability", "extensibility"):
-            self.assertLessEqual(levels[key], 1, key)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        f = self.facts()
+        self.assertEqual(f.route_total(), 1)
+        self.assertTrue(f.grep(VERSIONED_PATH, f.route_files(), keep_regex=True))

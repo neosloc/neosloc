@@ -172,12 +172,12 @@ class Logging(Base):
     def test_debug_shows_detector_timings(self):
         status, _, err = run("--log-level", "debug", self.dir)
         self.assertEqual(status, EXIT_OK)
-        self.assertIn("detector interface: level", err)
+        self.assertIn("dimension interface:", err)
         self.assertIn("assessed", err)
 
     def test_env_var_level(self):
         _, _, err = run(self.dir, env={"NEOSLOC_LOG_LEVEL": "debug"})
-        self.assertIn("detector legibility", err)
+        self.assertIn("dimension legibility", err)
 
     def test_bad_env_level_is_a_usage_error(self):
         status, out, _ = run("--json", self.dir, env={"NEOSLOC_LOG_LEVEL": "loud"})
@@ -187,7 +187,7 @@ class Logging(Base):
     def test_json_log_lines(self):
         _, _, err = run("--log-level", "debug", "--log-format", "json", self.dir)
         lines = [json.loads(l) for l in err.splitlines()]
-        timing = next(l for l in lines if l.get("detector") == "interface")
+        timing = next(l for l in lines if l.get("dimension") == "interface")
         self.assertEqual(timing["level"], "debug")
         self.assertIn("seconds", timing)
         self.assertIn("dimension_level", timing)
