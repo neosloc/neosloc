@@ -23,6 +23,9 @@ neosloc path/to/repo
 | Make or buy | Is rebuilding it with agents cheaper than adopting it? Tokens, time and money. | [Make or buy](makebuy.md) |
 | Probe / judge / review | What happens when a model actually tries to integrate with it? Do models agree with the detectors? | [LLM evaluators](evaluators.md) |
 
+The [**archive**](https://neosloc.github.io/archive/) runs neosloc on public repositories
+every week and keeps every result.
+
 Every level comes with **evidence** (the files that justify it) and **gaps** (what to do
 next), so the report can be used as a to-do list, not just a score.
 

@@ -47,7 +47,8 @@ Value (neoCOCOMO, cost approach; see neosloc/value.py)
   Knowledge at risk:             38% of replacement cost lives only in code and history
 ```
 
-**Documentation: <https://neosloc.github.io/neosloc/>**
+**Documentation: <https://neosloc.github.io/neosloc/>** ·
+**Archive of assessed repositories: <https://neosloc.github.io/archive/>**
 
 ## Install
 
