@@ -3,6 +3,13 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## 0.7.2
+
+- **Much faster stability history on projects with many releases.** The contract-history
+  check compares the most recent 20 tagged releases (not all of them), finds the relevant
+  files with one `git grep` per release and reads them with one batched `git cat-file`.
+  On psf/requests (162 tags) it goes from over 10 minutes on a partial clone to 2.4 s.
+
 ## 0.7.1
 
 - The project moved to the **neosloc** organization: https://github.com/neosloc/neosloc

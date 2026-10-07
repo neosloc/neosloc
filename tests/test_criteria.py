@@ -380,6 +380,22 @@ class Stability(Fixture):
         self.assertIn("op DELETE /v1/items/{id}", note)
 
 
+class HistoryPerformance(Fixture):
+    def test_batched_reads_and_tag_cap(self):
+        from neosloc import facts
+        self.cli_tool()
+        self.git("init", "-q")
+        for i in range(facts.MAX_HISTORY_TAGS + 5):
+            self.write("tool/v.py", "VERSION = %d\n" % i)
+            self.commit("release %d" % i, "v0.%d.0" % i)
+        repo = Repo(self.dir)
+        texts = repo.git_cat_files(["v0.3.0:tool/v.py", "v0.4.0:tool/v.py", "v0.4.0:missing.py"])
+        self.assertEqual(texts, {"v0.3.0:tool/v.py": "VERSION = 3\n", "v0.4.0:tool/v.py": "VERSION = 4\n"})
+        compared, removed, ev = Facts(repo).history_removals()
+        self.assertEqual(compared, facts.MAX_HISTORY_TAGS - 1)
+        self.assertEqual(removed, [])
+
+
 class Events(Fixture):
     def test_inbound_webhooks_only(self):
         self.fastapi_service()

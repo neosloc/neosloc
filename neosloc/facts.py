@@ -257,6 +257,8 @@ BREAKING_MARK = re.compile(r"\bbreaking\b|\bincompatib|^#+\s*removed\b|\bdepreca
 DEPRECATION = re.compile(r"@Deprecated|@deprecated|DeprecationWarning|FutureWarning|#\[deprecated|\bdeprecated\s*=\s*True|"
                          r"Deprecation:|Sunset:|\[Obsolete|warnings\.warn\(|@available\([^)]*deprecated")
 VERSIONED_PATH = re.compile(r"""['"`]\^?/?(api/)?v\d+(/|['"`])""")
+MAX_HISTORY_TAGS = 20
+HISTORY_GREP = r"add_argument|__all__|Deprecat|deprecated|warnings\.warn|FutureWarning"
 FIX_SUBJECT = re.compile(r"\b(fix(e[sd])?|bug|hotfix|patch|regression|crash|broken|workaround|revert)\b", re.I)
 
 # Library / frontend
@@ -637,31 +639,35 @@ class Facts:
     def history_removals(self) -> Tuple[int, List[str], Hits]:
         """Across consecutive semver tags: (comparisons made, items removed without prior deprecation, evidence).
 
-        Items are OpenAPI operations, CLI long options and Python `__all__` names."""
-        tags = self.semver_tags()
+        Items are OpenAPI operations, CLI long options and Python `__all__` names. Only the most
+        recent MAX_HISTORY_TAGS releases are compared (the history integrators live with), and
+        each release is read with one `git grep` plus one batched `git cat-file`, so projects
+        with hundreds of tags (and partial clones) stay fast."""
+        tags = self.semver_tags()[-MAX_HISTORY_TAGS:]
         if len(tags) < 2:
             return 0, [], []
 
         def snapshot(tag):
-            files = self.repo.git_safe("ls-tree", "-r", "--name-only", tag).split("\n")
+            listing = self.repo.git_safe("ls-tree", "-r", "--name-only", tag).split("\n")
+            specs = ["%s:%s" % (tag, f) for f in listing if f and not self.repo.is_test(f)
+                     and f.endswith((".yaml", ".yml", ".json")) and re.search(r"openapi|swagger", f, re.I)]
+            grep = self.repo.git_safe("grep", "-l", "-E", HISTORY_GREP, tag, "--", "*.py")
+            specs += [line for line in grep.split("\n") if line and not self.repo.is_test(line.split(":", 1)[-1])]
+            texts = self.repo.git_cat_files(specs)
             items: Set[str] = set()
             deprecated_text = ""
-            for f in files:
-                if not f or self.repo.is_test(f):
+            for spec, text in texts.items():
+                f = spec.split(":", 1)[1]
+                if not f.endswith(".py"):
+                    items |= {"op " + o for o in openapi_operations(text, f) or ()}
                     continue
-                if f.endswith((".yaml", ".yml", ".json")) and re.search(r"openapi|swagger", f, re.I):
-                    ops = openapi_operations(self.repo.git_safe("show", "%s:%s" % (tag, f)), f)
-                    items |= {"op " + o for o in ops or ()}
-                elif f.endswith(".py"):
-                    text = self.repo.git_safe("show", "%s:%s" % (tag, f))
-                    if "add_argument" in text:
-                        items |= {"option " + o for o in re.findall(r"""add_argument\([^)]*?['"](--[\w-]+)['"]""", text)}
-                    if f.endswith("__init__.py") and f.count("/") <= 1:
-                        m = re.search(r"^__all__\s*=\s*\[([^\]]*)\]", text, re.M)
-                        if m:
-                            items |= {"symbol " + s for s in re.findall(r"['\"](\w+)['\"]", m.group(1))}
-                    if DEPRECATION.search(text):
-                        deprecated_text += text
+                items |= {"option " + o for o in re.findall(r"""add_argument\([^)]*?['"](--[\w-]+)['"]""", text)}
+                if f.endswith("__init__.py") and f.count("/") <= 1:
+                    m = re.search(r"^__all__\s*=\s*\[([^\]]*)\]", text, re.M)
+                    if m:
+                        items |= {"symbol " + x for x in re.findall(r"['\"](\w+)['\"]", m.group(1))}
+                if DEPRECATION.search(text):
+                    deprecated_text += text
             return items, deprecated_text
 
         removed: List[str] = []

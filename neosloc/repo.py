@@ -239,6 +239,29 @@ class Repo:
             check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         ).stdout.decode("utf-8", errors="replace")
 
+    def git_cat_files(self, specs: List[str]) -> Dict[str, str]:
+        """Read many `rev:path` blobs with one `git cat-file --batch` process."""
+        if not specs or not self.is_git:
+            return {}
+        try:
+            out = subprocess.run(["git", "-C", self.root, "cat-file", "--batch"], input="\n".join(specs).encode() + b"\n",
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=True).stdout
+        except (OSError, subprocess.CalledProcessError):
+            return {}
+        result, pos = {}, 0
+        for spec in specs:
+            nl = out.find(b"\n", pos)
+            if nl < 0:
+                break
+            header = out[pos:nl].split()
+            pos = nl + 1
+            if len(header) == 3 and header[1] == b"blob":
+                size = int(header[2])
+                result[spec] = out[pos:pos + size].decode("utf-8", errors="replace")
+                pos += size + 1  # content, then a newline
+            # "<spec> missing": nothing else to skip
+        return result
+
     def git_safe(self, *args: str) -> str:
         if not self.is_git:
             return ""
