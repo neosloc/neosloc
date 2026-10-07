@@ -3,6 +3,14 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## 0.7.3
+
+- **Fix:** directories named `examples`, `samples`, `demos`, `docs`, `fixtures` or `bench`
+  are excluded as example code only up to two levels below the root (`examples/`, `packages/x/examples/`). Deeper, they are
+  ordinary code: spring-petclinic's Java package `org/springframework/samples/petclinic`
+  was read as zero source files. Vendored directories (`vendor`, `third_party`, `libs`, …)
+  are still excluded at any depth. Found by the archive.
+
 ## 0.7.2
 
 - **Much faster stability history on projects with many releases.** The contract-history

@@ -610,6 +610,16 @@ class Classification(Fixture):
         self.assertEqual(sorted(Repo(self.dir).source_files(include_tests=False)), ["app/main.py", "app/specs/models.py"])
 
 
+class ExampleDepth(Fixture):
+    def test_deep_package_named_samples_is_product_code(self):
+        self.write("src/main/java/org/acme/samples/petclinic/App.java", "class App {}\n")
+        self.write("examples/demo/Main.java", "class Main {}\n")
+        self.write("packages/core/examples/x.py", "x = 1\n")
+        self.write("web/static/js/libs/jquery.js", "x = 1\n")
+        self.assertEqual(Repo(self.dir).source_files(include_tests=False),
+                         ["src/main/java/org/acme/samples/petclinic/App.java"])
+
+
 class Value(Fixture):
     def test_value_model(self):
         self.git("init", "-q")

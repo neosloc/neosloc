@@ -43,10 +43,11 @@ TEST_PATH_RE = re.compile(
     r"|\.(test|spec)\.[jt]sx?$|Tests?\.(java|kt|cs|swift)$|_spec\.rb$"
 )
 
-EXAMPLE_PATH_RE = re.compile(
-    r"(^|/)(examples?|samples?|demos?|docs?|fixtures|bench|benchmarks?"
-    r"|vendored|third[_-]?party|external|libs)(/|$)"  # vendored code isn't this project's
-)
+# Example-like directories only count near the root (up to two levels: `examples/`, `packages/x/examples/`):
+# deeper, the same names are ordinary code, e.g. the Java package `org/springframework/samples/`.
+EXAMPLE_PATH_RE = re.compile(r"^([^/]+/){0,2}(examples?|samples?|demos?|docs?|fixtures|bench|benchmarks?)(/|$)")
+# Vendored code isn't this project's, wherever it sits.
+VENDORED_PATH_RE = re.compile(r"(^|/)(vendor|vendored|third[_-]?party|external|libs)(/|$)")
 
 GENERATED_NAME_RE = re.compile(
     r"(\.min\.(js|css)|[.-]bundle\.js|(^|/)bundle\.js|\.pb\.go|_pb2(_grpc)?\.py|\.generated\.\w+"
@@ -192,7 +193,7 @@ class Repo:
 
     @staticmethod
     def is_example(rel: str) -> bool:
-        return bool(EXAMPLE_PATH_RE.search(rel))
+        return bool(EXAMPLE_PATH_RE.search(rel) or VENDORED_PATH_RE.search(rel))
 
     def source_files(self, include_tests: bool = True) -> List[str]:
         """All source files, or with include_tests=False only product code
