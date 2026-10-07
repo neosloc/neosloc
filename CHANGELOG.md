@@ -3,7 +3,7 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
-## Unreleased
+## 0.7.1
 
 - The project moved to the **neosloc** organization: https://github.com/neosloc/neosloc
   (old `sirmmo/neosloc` URLs redirect). Docs: https://neosloc.github.io/neosloc/
