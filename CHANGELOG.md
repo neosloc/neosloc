@@ -3,6 +3,13 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## 0.7.4
+
+- **Fix:** a lower-case `readme.md` (common on npm) counts as a README.
+- **Fix:** exception types are recognised in JavaScript/TypeScript and Java
+  (`class X extends Error`), Kotlin and C# (`class X : Exception`) and Rust (`struct XError`),
+  not only Python and Swift. Both found by evaluating sindresorhus/ky through the archive.
+
 ## 0.7.3
 
 - **Fix:** directories named `examples`, `samples`, `demos`, `docs`, `fixtures` or `bench`

@@ -132,8 +132,11 @@ STD_LOGGER = re.compile(r"getLogger\(__name__\)|getLogger\(['\"][\w.]+['\"]\)|re
                         r"|\bLogger\(\s*(subsystem|label)|import Logging\b|os_log\(|electron-log|QLoggingCategory|Serilog|NLog")
 PRINT_CALL = re.compile(r"^\s*print\(", re.M)
 LOG_LEVEL_CALL = re.compile(r"\b(?:self\.|Self\.)?(?:log|logger|LOG|LOGGER|logging)\.(debug|info|notice|warning|warn|error|exception|critical|fault|trace)\(")
-EXCEPTION_CLASS = re.compile(r"^class\s+\w+\((\w+\.)?(\w*Error|\w*Exception)\)"
-                             r"|^\s*(public\s+|internal\s+)?(enum|struct|class)\s+\w+\s*:\s*[^{\n]*\b(Error|LocalizedError)\b", re.M)
+EXCEPTION_CLASS = re.compile(r"^class\s+\w+\((\w+\.)?(\w*Error|\w*Exception)\)"                       # Python
+                             r"|^\s*(public\s+|internal\s+)?(enum|struct|class)\s+\w+\s*:\s*[^{\n]*\b(Error|LocalizedError)\b"  # Swift
+                             r"|\bclass\s+\w+\s+extends\s+\w*(Error|Exception)\b"                          # JS/TS, Java
+                             r"|\bclass\s+\w+(\([^)]*\))?\s*:\s*\w*(Exception|Error)\b"                   # Kotlin, C#
+                             r"|\bstruct\s+\w+Error\b|\benum\s+\w*Error\b", re.M)                          # Rust, Go-style
 SYS_EXIT = re.compile(r"\bsys\.exit\(|\bexit\(\d")
 ARG_VALIDATION = re.compile(r"raise\s+(ValueError|TypeError|\w+Error)\(\s*f?['\"]|throw\s+new\s+(TypeError|RangeError|Error)\(")
 TIMEOUT_PARAM = re.compile(r"\btimeout\s*[:=]")
@@ -246,7 +249,7 @@ CREDENTIAL_STORE = re.compile(r"\bKeychain\b|SecItemAdd|kSecClass|\bkeytar\b|saf
 # Legibility
 CI = r"(^|/)(\.github/workflows/[^/]+\.ya?ml|\.gitlab-ci\.yml|\.circleci/config\.yml|Jenkinsfile|\.travis\.yml|azure-pipelines\.yml|\.woodpecker\.ya?ml|bitbucket-pipelines\.yml)$"
 LOCKFILES = r"(^|/)(uv\.lock|poetry\.lock|Pipfile\.lock|pdm\.lock|requirements[\w.-]*\.lock|package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Cargo\.lock|go\.sum|Gemfile\.lock|composer\.lock|gradle\.lockfile|packages\.lock\.json|flake\.lock|mix\.lock)$"
-README = r"^README(\.\w+)?$"
+README = r"^(?i:readme)(\.\w+)?$"  # README.md, readme.md (common on npm), Readme.rst
 MODULE_TOKEN_BUDGET = 32_000
 FILE_TOKEN_BUDGET = 12_000
 

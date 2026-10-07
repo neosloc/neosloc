@@ -620,6 +620,22 @@ class ExampleDepth(Fixture):
                          ["src/main/java/org/acme/samples/petclinic/App.java"])
 
 
+class FalseNegatives(Fixture):
+    """Found by evaluating sindresorhus/ky through the archive's issue workflow."""
+
+    def test_lowercase_readme(self):
+        self.write("readme.md", "# x\n")
+        self.assertTrue(Facts(Repo(self.dir)).paths(__import__("neosloc.facts", fromlist=["README"]).README))
+
+    def test_exception_classes_in_other_languages(self):
+        from neosloc.facts import EXCEPTION_CLASS
+        for src in ("export class HTTPError extends Error {}", "public class BadInput extends RuntimeException {}",
+                    "class ApiError(msg: String) : Exception(msg)", "public class ConfigException : Exception {}",
+                    "pub struct ParseError { kind: Kind }"):
+            self.assertTrue(EXCEPTION_CLASS.search(src), src)
+        self.assertFalse(EXCEPTION_CLASS.search("class Item extends Model {}"))
+
+
 class Value(Fixture):
     def test_value_model(self):
         self.git("init", "-q")
