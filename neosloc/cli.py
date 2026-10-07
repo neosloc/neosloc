@@ -23,11 +23,13 @@ from .model import Report
 from .repo import Repo
 from .report import to_text
 from .schema import SCHEMA_VERSION, dumps as schema_dumps
+from .makebuy import DEFAULT_MODEL as MAKE_MODEL, make_or_buy
 from .value import SLOCCOUNT_OVERHEAD, SLOCCOUNT_SALARY, value
 
 
 def analyze(path: str, only: Optional[List[str]] = None, salary: float = SLOCCOUNT_SALARY,
-            overhead: float = SLOCCOUNT_OVERHEAD, with_value: bool = True) -> Report:
+            overhead: float = SLOCCOUNT_OVERHEAD, with_value: bool = True, buy_price: float = 0.0,
+            horizon: float = 3.0, make_model: Optional[str] = None) -> Report:
     started = time.time()
     try:
         repo = Repo(path)
@@ -47,6 +49,8 @@ def analyze(path: str, only: Optional[List[str]] = None, salary: float = SLOCCOU
     report.surfaces = surfaces_summary(surfaces)
     if with_value:
         report.value = value(repo, results, salary, overhead)
+        report.make_or_buy = make_or_buy(results, leg, report.value, report.estimate, buy_price, horizon,
+                                         make_model or MAKE_MODEL)
     logger.debug("assessed %s in %.2fs", repo.root, time.time() - started,
                  extra={"target": repo.root, "seconds": round(time.time() - started, 3)})
     return report
@@ -126,6 +130,12 @@ def build_parser() -> argparse.ArgumentParser:
                      help="annual salary for cost figures (default: sloccount's %(default)s)")
     out.add_argument("--overhead", type=float, default=SLOCCOUNT_OVERHEAD,
                      help="overhead multiplier on salary (default: %(default)s)")
+    out.add_argument("--buy-price", type=float, default=0.0, metavar="USD",
+                     help="price per year of buying/adopting the product, for make-or-buy (default: 0)")
+    out.add_argument("--horizon", type=float, default=3.0, metavar="YEARS",
+                     help="make-or-buy horizon in years (default: %(default)s)")
+    out.add_argument("--make-model", default=None, metavar="MODEL",
+                     help="model whose prices cost the 'make' tokens (default: %s)" % MAKE_MODEL)
     out.add_argument("--version", action="version", version="neosloc " + __version__)
     lg = ap.add_argument_group("diagnostics (stderr)")
     lg.add_argument("--log-level", choices=list(LEVELS), default=None,
@@ -225,7 +235,8 @@ def _main(argv: List[str]) -> int:
     results: List[Any] = []   # Report or (path, PathError)
     for p in args.paths:
         try:
-            report = analyze(p, only, args.salary, args.overhead)
+            report = analyze(p, only, args.salary, args.overhead, buy_price=args.buy_price,
+                             horizon=args.horizon, make_model=args.make_model)
         except PathError as e:
             if len(args.paths) == 1:
                 raise

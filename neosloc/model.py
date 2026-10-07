@@ -59,6 +59,7 @@ class Report:
     not_implemented: List[str]
     value: Optional[Dict[str, Any]] = None
     surfaces: Optional[Dict[str, Any]] = None
+    make_or_buy: Optional[Dict[str, Any]] = None
     agentic: Optional[Dict[str, Any]] = None
     review: Optional[Dict[str, Any]] = None
     spend: Optional[Dict[str, Any]] = None
@@ -74,6 +75,7 @@ class Report:
             "estimate": self.estimate,
             "not_implemented": self.not_implemented,
             "value": self.value,
+            "make_or_buy": self.make_or_buy,
             "agentic": self.agentic,
             "review": self.review,
             "spend": self.spend,

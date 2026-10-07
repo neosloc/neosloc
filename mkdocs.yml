@@ -41,6 +41,7 @@ nav:
       - Dimensions: dimensions.md
       - Retrofit effort: estimate.md
       - "Value: neoCOCOMO": value.md
+      - Make or buy: makebuy.md
   - LLM evaluators:
       - Probe, judge, review: evaluators.md
       - Using OpenRouter: openrouter.md

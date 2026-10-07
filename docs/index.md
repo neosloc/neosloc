@@ -20,6 +20,7 @@ neosloc path/to/repo
 | Ten dimensions, levels 0–4 | How integrable is this, and what exactly is missing? | [Dimensions](dimensions.md) |
 | Retrofit effort | How much work to make it solidly integrable? | [Retrofit effort](estimate.md) |
 | neoCOCOMO value | What is it worth when an agent can re-type it? | [Value](value.md) |
+| Make or buy | Is rebuilding it with agents cheaper than adopting it? Tokens, time and money. | [Make or buy](makebuy.md) |
 | Probe / judge / review | What happens when a model actually tries to integrate with it? Do models agree with the detectors? | [LLM evaluators](evaluators.md) |
 
 Every level comes with **evidence** (the files that justify it) and **gaps** (what to do

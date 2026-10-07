@@ -3,6 +3,16 @@
 All notable changes are listed here. The project follows [semantic versioning](https://semver.org/);
 breaking changes to the CLI, the JSON report or the scoring are called out explicitly.
 
+## 0.7.0
+
+- **Make or buy.** Every report now costs rebuilding an equivalent with agents (tokens,
+  model cost, agent hours, human days for steering and for rediscovering history) against
+  adopting the project (integration, price, upgrades), over a horizon, with a verdict and a
+  break-even price. New options: `--buy-price`, `--horizon`, `--make-model`. New JSON field
+  `make_or_buy` (additive; schema_version stays 2).
+- The steering rate is calibrated on neosloc's own build (2.2 estimated vs about 2 real
+  days). neoCOCOMO's reproduce term is about 20× higher for neosloc; aligning it is open.
+
 ## 0.6.0
 
 Two criteria refinements for protocol servers and env-configured services (scores change):

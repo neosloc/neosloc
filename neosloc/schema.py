@@ -127,6 +127,21 @@ VALUE = _obj({
                          "rediscover_share": NUM, "fix_pm": NUM, "change_pm": NUM}),
 })
 
+TOKENS = _obj({"output": INT, "input": INT, "cached_input": INT})
+MAKE_OR_BUY = _obj({
+    "verdict": {"enum": ["make", "buy", "toss-up"]},
+    "make_buy_ratio": dict(NUM, description="Total make cost / total buy cost over the horizon."),
+    "horizon_years": NUM,
+    "break_even_price_per_year": dict(NULLABLE_NUM, description="Buy price per year at which both cost the same; "
+                                                                "<= 0 means make wins even if buying is free."),
+    "make": _obj({"model": STR, "tokens": TOKENS, "final_tokens": INT, "model_cost": NULLABLE_NUM,
+                  "agent_hours": NUM, "human_days": NUM, "review_days": NUM, "rediscover_days": NUM,
+                  "calendar_days": NUM, "build_cost": NUM, "yearly_cost": NUM, "total_cost": NUM}),
+    "buy": _obj({"tokens": TOKENS, "model_cost": NULLABLE_NUM, "integration_days": NUM, "upgrade_days_per_year": NUM,
+                 "price_per_year": NUM, "fixed_cost": NUM, "yearly_cost": NUM, "total_cost": NUM}),
+    "assumptions": {"type": "object"},
+})
+
 USAGE_FIELDS = {"input_tokens": INT, "output_tokens": INT, "cache_read_input_tokens": INT,
                 "cache_creation_input_tokens": INT}
 
@@ -190,6 +205,7 @@ REPORT = _obj({
     "estimate": {"$ref": "#/$defs/estimate"},
     "not_implemented": {"type": "array", "items": STR},
     "value": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/value"}]},
+    "make_or_buy": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/make_or_buy"}]},
     "agentic": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/agentic"}],
                 "description": "Present with --agentic or --judge."},
     "review": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/review"}], "description": "Present with --review."},
@@ -221,7 +237,7 @@ def schema() -> Dict[str, Any]:
             {"$ref": "#/$defs/error"},
         ],
         "$defs": {"report": REPORT, "error": ERROR, "dimension": DIMENSION, "evidence": EVIDENCE,
-                  "surfaces": SURFACES,
+                  "surfaces": SURFACES, "make_or_buy": MAKE_OR_BUY,
                   "estimate": ESTIMATE, "value": VALUE, "agentic": AGENTIC, "run": RUN, "task": TASK,
                   "scope_summary": SCOPE_SUMMARY, "review": REVIEW},
     }

@@ -18,6 +18,8 @@ neosloc measures that:
   is cheap to wrap;
 - **neoCOCOMO**: what the codebase is worth when an agent can re-type it, next to classic
   COCOMO;
+- a **make-or-buy** verdict: the tokens, agent hours and human days to rebuild an equivalent
+  with agents, against the cost of adopting this project (`--buy-price`, `--horizon`);
 - optional **LLM evaluators** on Anthropic or [OpenRouter](https://openrouter.ai): a
   *probe* attempts real integration tasks using only the docs, a *judge* checks the
   answers against the source, and a *review* audits every static level.

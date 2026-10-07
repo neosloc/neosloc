@@ -79,6 +79,9 @@ def to_text(report: Report, verbose: bool = False) -> str:
     if report.value:
         out.append("")
         out.extend(_value_lines(report.value))
+    if report.make_or_buy:
+        out.append("")
+        out.extend(_make_buy_lines(report.make_or_buy))
     if report.agentic:
         out.append("")
         out.extend(_agentic_lines(report.agentic, {d.key: d.level for d in report.dimensions}))
@@ -116,6 +119,38 @@ def _value_lines(v) -> list:
         % (v["value_pm"], _money(v["value_cost"]), _money(v["assumptions"]["cost_per_pm"])),
         "  Knowledge at risk:             %d%% of replacement cost lives only in code and history"
         % round(v["knowledge_at_risk"] * 100),
+    ]
+
+
+def _usd(x) -> str:
+    return "?" if x is None else ("$%.0f" % x if x < 1000 else "$" + _k(int(x)))
+
+
+def _make_buy_lines(m) -> list:
+    mk, by, h = m["make"], m["buy"], m["horizon_years"]
+    t = mk["tokens"]
+    verdict = {"make": "MAKE: rebuilding with agents is cheaper", "buy": "BUY: adopting this is cheaper",
+               "toss-up": "TOSS-UP: within 1.5x either way"}[m["verdict"]]
+    be = m["break_even_price_per_year"]
+    if be is None:
+        be_line = ""
+    elif be <= 0:
+        be_line = "make wins even if buying is free"
+    else:
+        be_line = "buying wins below %s/year" % _usd(be)
+    return [
+        "Make or buy (over %g years; see neosloc/makebuy.py)" % h,
+        "  Make with agents:  %s output + %s input tokens (%d%% cached) on %s = %s;"
+        % (_k(t["output"]), _k(t["input"]), round(100 * t["cached_input"] / max(t["input"], 1)), mk["model"],
+           _usd(mk["model_cost"])),
+        "                     %.1f agent-hours, %.1f human days (%.1f steering + %.1f rediscovering history), "
+        "~%.1f calendar days" % (mk["agent_hours"], mk["human_days"], mk["review_days"], mk["rediscover_days"],
+                                 mk["calendar_days"]),
+        "                     build %s, then %s/year to maintain -> %s"
+        % (_usd(mk["build_cost"]), _usd(mk["yearly_cost"]), _usd(mk["total_cost"])),
+        "  Buy (adopt this):  %.1f integration days, %s/year price, %.1f upgrade days/year -> %s"
+        % (by["integration_days"], _usd(by["price_per_year"]), by["upgrade_days_per_year"], _usd(by["total_cost"])),
+        "  Verdict:           %s (make/buy = %.2f)%s" % (verdict, m["make_buy_ratio"], "; " + be_line if be_line else ""),
     ]
 
 

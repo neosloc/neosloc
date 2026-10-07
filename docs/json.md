@@ -37,6 +37,7 @@ python -m jsonschema --instance report.json schema.json      # or any draft 2020
 | `dimensions[]` | `key`, `title`, `question`, `level` (0–4, or `null` when not applicable), `level_name` (`n/a` when null), `applicable`, `best_surface`, `rationale`, `evidence[]` (met requirements of the best surface), `gaps[]` (first unmet requirement per surface), `surfaces` (the full ladder per surface: each requirement's `level`, `id`, `text`, `met`, `evidence`, `note`), `metrics`. |
 | `estimate` | `integrability_index` (over applicable dimensions), `assessed_dimensions`, `not_applicable`, `retrofit_person_days`, `retrofit_by_dimension`, `wrappability`, `assumptions`. See [Retrofit effort](estimate.md). |
 | `value` | neoCOCOMO figures: `classic`, `capture`, `agent_factor`, `history`, `knowledge_at_risk`, `value_pm`, `value_cost`, `assumptions`. See [Value](value.md). |
+| `make_or_buy` | `verdict` (make, buy, toss-up), `make_buy_ratio`, `horizon_years`, `break_even_price_per_year`, `make` (tokens, model cost, agent hours, human days, calendar days, costs) and `buy` (integration days, upgrade days, price, costs). See [Make or buy](makebuy.md). |
 | `agentic` | With `--agentic`/`--judge`: `runs[]` (one per probe model; per-scope `summary`, per-task records, `documentation_gap`) and `panel`. Otherwise `null`. |
 | `review` | With `--review`: per-dimension reviews, `consensus`, `spread`, `reviewed_index`, `disagreements`. Otherwise `null`. |
 | `spend` | With any evaluator: `usd`, `max_usd`, `unpriced_calls`. Otherwise `null`. |
